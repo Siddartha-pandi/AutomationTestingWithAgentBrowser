@@ -17,7 +17,7 @@ from backend.app.engine.testing.test_runner import TestRunner
 from backend.app.engine.testing.test_schema import TestCaseDefinition, TestSuiteDefinition
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.execution import Execution
-from backend.app.models.project import Project
+from backend.app.models.project import Project, ProjectMember
 from backend.app.api.v1.projects import resolve_project_id
 from backend.app.schemas.flows import ExecutionDetailResponse
 from backend.app.schemas.testing import ExecuteTestRequest, TestSuiteCreateRequest, TestSuiteResponse
@@ -109,9 +109,21 @@ def list_test_suites(
         .options(joinedload(AutomationDefinition.versions))
     )
     if project_id:
-        proj = resolve_project_id(db, project_id)
+        proj = resolve_project_id(db, project_id, current_user.id)
         if proj:
             query = query.filter(AutomationDefinition.project_id == proj.id)
+        else:
+            return []
+    elif not getattr(current_user, "is_superuser", False):
+        user_projects = (
+            db.query(Project.id)
+            .filter(
+                (Project.owner_id == current_user.id)
+                | (Project.members.any(ProjectMember.user_id == current_user.id))
+            )
+            .subquery()
+        )
+        query = query.filter(AutomationDefinition.project_id.in_(user_projects))
 
     suites = query.order_by(AutomationDefinition.updated_at.desc()).offset(offset).limit(limit).all()
     results = []

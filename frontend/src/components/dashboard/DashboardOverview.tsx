@@ -87,32 +87,37 @@ export function DashboardOverview({ projectId, onNavigate, onSelectExecution }: 
   const runningExecutions = executions.filter((e) => e.status === "running").length;
   const successRate = totalExecutions > 0 ? Math.round((passedExecutions / totalExecutions) * 100) : 100;
 
-  // Chart 1: Execution Trend Data
-  const trendData = [
-    { day: "Mon", executions: 18, passed: 17, failed: 1 },
-    { day: "Tue", dayLabel: "Tue", executions: 24, passed: 23, failed: 1 },
-    { day: "Wed", executions: 32, passed: 31, failed: 1 },
-    { day: "Thu", executions: 29, passed: 28, failed: 1 },
-    { day: "Fri", executions: 38, passed: 37, failed: 1 },
-    { day: "Sat", executions: 15, passed: 15, failed: 0 },
-    { day: "Sun", executions: 22, passed: 21, failed: 1 },
-  ];
+  // Chart 1: Execution Trend Data dynamically computed from real workspace executions
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const trendData = daysOfWeek.map((day) => {
+    const dayExecs = executions.filter((e) => {
+      if (!e.created_at) return false;
+      const d = new Date(e.created_at);
+      const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+      return dayName === day;
+    });
+    const p = dayExecs.filter((e) => e.status === "completed" || e.status === "passed").length;
+    const f = dayExecs.filter((e) => e.status === "failed").length;
+    return { day, executions: dayExecs.length, passed: p, failed: f };
+  });
 
-  // Chart 2: Success vs Failure Data
-  const successFailureData = [
-    { category: "Login & Auth", Passed: 120, Failed: 3 },
-    { category: "Checkout Flow", Passed: 85, Failed: 4 },
-    { category: "KYC Documents", Passed: 64, Failed: 1 },
-    { category: "DOM Extract", Passed: 92, Failed: 2 },
-    { category: "Regression", Passed: 145, Failed: 5 },
-  ];
+  // Chart 2: Success vs Failure Data derived from real tests and flows
+  const successFailureData = flows.length > 0
+    ? flows.slice(0, 5).map((flow) => {
+        const flowExecs = executions.filter((e) => e.flow_id === flow.id || e.name === flow.name);
+        const p = flowExecs.filter((e) => e.status === "completed" || e.status === "passed").length;
+        const f = flowExecs.filter((e) => e.status === "failed").length;
+        return { category: flow.name || "Flow", Passed: p, Failed: f };
+      })
+    : [];
 
-  // Chart 3: Execution Status Distribution Data
+  // Chart 3: Execution Status Distribution Data from actual runs
+  const queuedExecutions = executions.filter((e) => e.status === "queued" || e.status === "pending").length;
   const statusDistributionData = [
     { name: "Passed", value: passedExecutions, color: "#10B981" },
     { name: "Failed", value: failedExecutions, color: "#EF4444" },
     { name: "Running", value: runningExecutions, color: "#2563EB" },
-    { name: "Queued", value: 2, color: "#F59E0B" },
+    { name: "Queued", value: queuedExecutions, color: "#F59E0B" },
   ];
 
   // Recent Executions list

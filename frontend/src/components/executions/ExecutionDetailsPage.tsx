@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -23,6 +23,7 @@ import {
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
 import { NavView } from "../layout/AppShell";
+import { executionsApi } from "@/api";
 
 interface ExecutionDetailsPageProps {
   executionId?: string;
@@ -31,7 +32,7 @@ interface ExecutionDetailsPageProps {
 }
 
 export function ExecutionDetailsPage({
-  executionId = "exec-run-101",
+  executionId,
   projectId,
   onNavigate,
 }: ExecutionDetailsPageProps) {
@@ -40,117 +41,64 @@ export function ExecutionDetailsPage({
   >("overview");
 
   const [zoomScreenshot, setZoomScreenshot] = useState<string | null>(null);
+  const [execution, setExecution] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const { success, info } = useToast();
   const { confirm } = useConfirm();
 
-  // Execution Details Data
-  const execution = {
-    id: executionId,
-    name: "Customer Onboarding & Email Verification",
-    type: "Visual Flow DAG",
-    version: "v2.1 (Pinned Immutable)",
-    status: "passed",
-    environment: "Staging",
-    trigger_type: "Manual Operator",
-    user: "Lead Administrator",
-    start_time: "2026-11-10 09:14:02 IST",
-    end_time: "2026-11-10 09:14:06 IST",
-    duration: "4.21s",
-    session_id: "sess-agent-0412-obscura",
-    total_steps: 5,
-    passed_steps: 5,
-    failed_steps: 0,
+  useEffect(() => {
+    if (executionId) {
+      loadExecution();
+    } else {
+      setExecution(null);
+    }
+  }, [executionId]);
+
+  const loadExecution = async () => {
+    if (!executionId) return;
+    setLoading(true);
+    try {
+      const res = await executionsApi.get(executionId);
+      if (res) {
+        setExecution({
+          id: String(res.id),
+          name: res.name || "Flow Execution",
+          type: res.type || "Visual Flow DAG",
+          version: res.version || "v1.0 (Pinned)",
+          status: res.status || "completed",
+          environment: res.environment || "Staging",
+          trigger_type: res.trigger_type || "Manual Operator",
+          user: res.user || "Operator",
+          start_time: res.started_at || "Recent",
+          end_time: res.completed_at || "Recent",
+          duration: res.duration_ms ? `${(res.duration_ms / 1000).toFixed(2)}s` : "0.00s",
+          session_id: res.session_id || "sess-agent",
+          total_steps: Array.isArray(res.steps) ? res.steps.length : 0,
+          passed_steps: Array.isArray(res.steps) ? res.steps.filter((s: any) => s.status === "passed").length : 0,
+          failed_steps: Array.isArray(res.steps) ? res.steps.filter((s: any) => s.status === "failed").length : 0,
+          steps: Array.isArray(res.steps) ? res.steps : [],
+          screenshots: Array.isArray(res.screenshots) ? res.screenshots : [],
+          logs: Array.isArray(res.logs) ? res.logs.map((l: any) => ({
+            level: "INFO",
+            time: "Recent",
+            msg: typeof l === "string" ? l : JSON.stringify(l),
+          })) : [],
+        });
+      }
+    } catch {
+      setExecution(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const steps = [
-    {
-      index: 1,
-      name: "Navigate to Staging Portal",
-      action: "navigate",
-      status: "passed",
-      duration: "1.24s",
-      start_time: "09:14:02.120",
-      input: { url: "https://staging.internal.company.net/auth", timeout: 30 },
-      output: { http_status: 200, response_time_ms: 1240 },
-      expected: "HTTP 200 OK",
-      actual: "HTTP 200 OK",
-      error: null,
-    },
-    {
-      index: 2,
-      name: "Fill Corporate Email",
-      action: "fill",
-      status: "passed",
-      duration: "0.45s",
-      start_time: "09:14:03.360",
-      input: { logical_id: "login_email_input", value: "[REDACTED_EMAIL]" },
-      output: { value_set: true, characters_typed: 26 },
-      expected: "Input populated",
-      actual: "Input populated",
-      error: null,
-    },
-    {
-      index: 3,
-      name: "Click Submit Login",
-      action: "click",
-      status: "passed",
-      duration: "0.62s",
-      start_time: "09:14:03.810",
-      input: { logical_id: "login_submit_btn", strategy: "deterministic_multi_factor" },
-      output: { clicked: true, confidence: 0.984 },
-      expected: "Element interactive & clicked",
-      actual: "Clicked uniquely",
-      error: null,
-    },
-    {
-      index: 4,
-      name: "Assert URL Contains Dashboard",
-      action: "assert_url",
-      status: "passed",
-      duration: "0.15s",
-      start_time: "09:14:04.430",
-      input: { expected_substring: "/dashboard" },
-      output: { current_url: "https://staging.internal.company.net/dashboard" },
-      expected: "Contains '/dashboard'",
-      actual: "https://staging.internal.company.net/dashboard",
-      error: null,
-    },
-    {
-      index: 5,
-      name: "Capture Post-Login Viewport",
-      action: "screenshot",
-      status: "passed",
-      duration: "0.85s",
-      start_time: "09:14:04.580",
-      input: { full_page: true, filename: "dashboard_post_login.png" },
-      output: { path: "./reports/screenshots/live_01.png", size_bytes: 142850 },
-      expected: "Screenshot captured",
-      actual: "Saved (142 KB)",
-      error: null,
-    },
-  ];
-
-  const screenshots = [
-    {
-      id: "sc-1",
-      name: "dashboard_post_login.png",
-      step: "Step 5: Capture Post-Login Viewport",
-      time: "09:14:05 IST",
-      url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='350' viewBox='0 0 600 350'><rect width='600' height='350' fill='%230f172a'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-family='sans-serif' font-size='16'>Step 5: Viewport Capture Post-Login</text></svg>",
-    },
-  ];
-
-  const logs = [
-    { level: "INFO", time: "09:14:02.110", msg: "Agent Browser CLI 0.41.2 daemon spawned." },
-    { level: "DEBUG", time: "09:14:02.150", msg: "Domain whitelist checked. Target allowed: staging.internal.company.net" },
-    { level: "INFO", time: "09:14:03.360", msg: "Input sanitized and redacted for parameter 'user_email'." },
-    { level: "DEBUG", time: "09:14:03.810", msg: "Deterministic multi-factor element search resolved in 14ms." },
-    { level: "INFO", time: "09:14:04.580", msg: "Full-page screenshot persisted with SHA-256 integrity hash." },
-    { level: "INFO", time: "09:14:05.430", msg: "Flow execution completed with return code 0." },
-  ];
+  const steps = execution?.steps || [];
+  const screenshots = execution?.screenshots || [];
+  const logs = execution?.logs || [];
 
   const handleRerun = () => {
+    if (!execution) return;
     confirm({
       title: "Rerun Execution",
       message: `Rerun flow '${execution.name}' using pinned version '${execution.version}'?`,
@@ -162,6 +110,26 @@ export function ExecutionDetailsPage({
       },
     });
   };
+
+  if (!execution) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 space-y-3">
+          <Terminal className="w-10 h-10 text-slate-400 mx-auto" />
+          <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">No Execution Selected</h2>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Select an execution run from Running Executions or Execution History to view detailed step timings, DOM snapshots, logs, and screenshots.
+          </p>
+          <button
+            onClick={() => onNavigate("executions_history")}
+            className="mt-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+          >
+            View Execution History
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -282,7 +250,7 @@ export function ExecutionDetailsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {steps.map((st) => (
+                {steps.map((st: any) => (
                   <tr key={st.index} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
                     <td className="py-3 px-3 font-mono font-bold text-slate-400">{st.index}</td>
                     <td className="py-3 px-3 font-semibold text-slate-900 dark:text-slate-100">{st.name}</td>
@@ -314,9 +282,9 @@ export function ExecutionDetailsPage({
       {/* TAB 3: SCREENSHOTS */}
       {activeTab === "screenshots" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {screenshots.map((s) => (
+          {screenshots.map((s: any) => (
             <div
-              key={s.id}
+              key={s.id || s.name}
               onClick={() => setZoomScreenshot(s.url)}
               className="p-3 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2 cursor-pointer group hover:border-blue-500 transition"
             >
@@ -325,7 +293,7 @@ export function ExecutionDetailsPage({
               </div>
               <div className="text-xs">
                 <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">{s.name}</div>
-                <div className="text-[10px] text-slate-400">{s.step} • {s.time}</div>
+                <div className="text-[10px] text-slate-400">{s.step || "Step"} • {s.time || "Recent"}</div>
               </div>
             </div>
           ))}
@@ -335,7 +303,7 @@ export function ExecutionDetailsPage({
       {/* TAB 4: LOGS */}
       {activeTab === "logs" && (
         <div className="p-4 rounded-2xl bg-slate-950 text-slate-200 font-mono text-xs space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
-          {logs.map((l, idx) => (
+          {logs.map((l: any, idx: number) => (
             <div key={idx} className="flex items-start gap-3 leading-tight">
               <span className="text-slate-500 shrink-0">{l.time}</span>
               <span

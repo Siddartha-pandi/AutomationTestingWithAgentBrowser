@@ -1,0 +1,78 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    container_name: automation_testing_devcontainer
+    restart: unless-stopped
+    volumes:
+      - ..:/workspaces/AutomationTestingWithAgentBrowser:cached
+    # Keeps container running indefinitely for VS Code Remote Connection
+    command: sleep infinity
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database connection to the internal Docker Postgres service
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/automation_platform_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: automation_platform_db
+
+      # Message Broker & Celery Worker
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      CELERY_WORKER_CONCURRENCY: "4"
+
+      # Security & JWT
+      JWT_SECRET: dev-secret-key-for-local-development-environment-32chars
+      TOKEN_EXPIRY_MINUTES: "480"
+      CREDENTIALS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+      # Browser Automation & Storage
+      AGENT_BROWSER_CLI: agent-browser
+      AGENT_BROWSER_TIMEOUT: "30.0"
+      STORAGE_DIR: /workspaces/AutomationTestingWithAgentBrowser/reports
+      DEFAULT_TIMEZONE: Asia/Kolkata
+      ZERO_AI_POLICY_ENFORCED: "true"
+
+      # Networking & CORS
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: automation_dev_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: automation_platform_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - devcontainer_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d automation_platform_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: automation_dev_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  devcontainer_postgres_data:

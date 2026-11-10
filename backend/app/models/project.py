@@ -26,11 +26,13 @@ class Project(Base):
 
     # Relationships
     owner = relationship("User", back_populates="projects")
+    members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan")
     environments = relationship("Environment", back_populates="project", cascade="all, delete-orphan")
     credentials = relationship("Credential", back_populates="project", cascade="all, delete-orphan")
     definitions = relationship("AutomationDefinition", back_populates="project", cascade="all, delete-orphan")
     element_profiles = relationship("ElementProfile", back_populates="project", cascade="all, delete-orphan")
     executions = relationship("Execution", back_populates="project", cascade="all, delete-orphan")
+    datasets = relationship("TestDataset", back_populates="project", cascade="all, delete-orphan")
 
 
 class Environment(Base):
@@ -65,4 +67,40 @@ class Credential(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False)
 
     project = relationship("Project", back_populates="credentials")
+
+
+class ProjectMember(Base):
+    """Team members assigned to a project with role-based permissions."""
+
+    __tablename__ = "project_members"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    role = Column(String(32), default="viewer", nullable=False)  # admin, editor, runner, viewer
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False)
+
+    project = relationship("Project", back_populates="members")
+    user = relationship("User")
+
+
+class TestDataset(Base):
+    """Reusable dataset for parameterized data-driven browser testing."""
+
+    __tablename__ = "test_datasets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    name = Column(String(160), index=True, nullable=False)
+    description = Column(Text, nullable=True)
+    format = Column(String(32), default="json", nullable=False)  # 'json' or 'csv'
+    headers = Column(JSONB, default=list, nullable=False)
+    rows = Column(JSONB, default=list, nullable=False)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), server_default=func.now(), nullable=False)
+
+    project = relationship("Project", back_populates="datasets")
+    creator = relationship("User")
+
 

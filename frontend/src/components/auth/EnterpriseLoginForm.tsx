@@ -60,11 +60,7 @@ export function EnterpriseLoginForm({
   const emailInputRef = useRef<HTMLInputElement>(null);
   const policyTooltipRef = useRef<HTMLDivElement>(null);
 
-  // Check feature flags for Demo Admin option
-  // Strictly enabled only in development with explicit feature flag
-  const isDev = process.env.NODE_ENV === "development";
-  const isDemoAuthEnabled =
-    process.env.NEXT_PUBLIC_ENABLE_DEMO_AUTH === "true" && isDev;
+
 
   // Restore remembered email safely on mount
   useEffect(() => {
@@ -174,13 +170,7 @@ export function EnterpriseLoginForm({
     }
   }
 
-  // Development-Only Demo Connect Helper
-  function handleDemoLogin() {
-    setEmail("admin@company.internal");
-    setPassword("AdminPass123!");
-    setErrors({ email: "", password: "" });
-    setAuthError("");
-  }
+
 
   function handleForgotSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -444,25 +434,6 @@ export function EnterpriseLoginForm({
                 )}
               </button>
             </form>
-
-            {/* Development-Only Demo Credentials Shortcut */}
-            {isDemoAuthEnabled && (
-              <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
-                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-                  <span className="text-[11px] font-mono flex items-center gap-1">
-                    <UserCheck className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Dev Environment Shortcut</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleDemoLogin}
-                    className="text-blue-600 dark:text-blue-400 hover:underline font-semibold text-[11px]"
-                  >
-                    Autofill Demo Admin
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Registration / Account Request Link */}

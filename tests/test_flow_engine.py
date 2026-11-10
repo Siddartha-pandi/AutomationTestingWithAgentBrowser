@@ -175,6 +175,106 @@ class TestActionRegistry:
         assert res_false.status == "passed"
         assert res_false.next_handle == "false"
 
+    def test_extended_browser_actions(self, mock_adapter: MagicMock) -> None:
+        registry = ActionRegistry(mock_adapter)
+        scope = VariableScope()
+
+        # Hover
+        mock_adapter.is_visible.return_value = True
+        mock_adapter.hover.return_value = MagicMock(is_success=True, duration_ms=10.0)
+        res_hover = registry.execute_action(
+            action=FlowActionType.HOVER,
+            session_id="sess-1",
+            config={"target": {"selector": "#menu-btn"}},
+            scope=scope,
+        )
+        assert res_hover.status == "passed"
+        assert res_hover.result_data["hovered"] is True
+
+        # Check
+        mock_adapter.check.return_value = MagicMock(is_success=True, duration_ms=12.0)
+        res_check = registry.execute_action(
+            action=FlowActionType.CHECK,
+            session_id="sess-1",
+            config={"target": {"selector": "input#agree"}},
+            scope=scope,
+        )
+        assert res_check.status == "passed"
+        assert res_check.result_data["checked"] is True
+
+        # Scroll
+        mock_adapter.scroll.return_value = MagicMock(is_success=True, duration_ms=15.0)
+        res_scroll = registry.execute_action(
+            action=FlowActionType.SCROLL,
+            session_id="sess-1",
+            config={"direction": "down", "amount": 500},
+            scope=scope,
+        )
+        assert res_scroll.status == "passed"
+        assert res_scroll.result_data["direction"] == "down"
+
+        # Back & Forward
+        mock_adapter.back.return_value = MagicMock(is_success=True, duration_ms=8.0)
+        res_back = registry.execute_action(action=FlowActionType.BROWSER_BACK, session_id="sess-1", config={}, scope=scope)
+        assert res_back.status == "passed"
+
+    def test_data_operations(self, mock_adapter: MagicMock) -> None:
+        registry = ActionRegistry(mock_adapter)
+        scope = VariableScope(initial_vars={"user_name": "Alice"})
+
+        # String Operation (Upper)
+        res_str = registry.execute_action(
+            action=FlowActionType.STRING_OP,
+            session_id="sess-1",
+            config={"operation": "upper", "input": "{{user_name}}", "output_variable": "upper_name"},
+            scope=scope,
+        )
+        assert res_str.status == "passed"
+        assert scope.get("upper_name") == "ALICE"
+
+        # Number Operation (Multiply)
+        res_num = registry.execute_action(
+            action=FlowActionType.NUMBER_OP,
+            session_id="sess-1",
+            config={"operation": "multiply", "a": 5, "b": 10, "output_variable": "total"},
+            scope=scope,
+        )
+        assert res_num.status == "passed"
+        assert scope.get("total") == 50.0
+
+        # JSON Operation (Parse)
+        res_json = registry.execute_action(
+            action=FlowActionType.JSON_OP,
+            session_id="sess-1",
+            config={"operation": "parse", "input": '{"status": "active", "code": 200}', "output_variable": "parsed"},
+            scope=scope,
+        )
+        assert res_json.status == "passed"
+        assert scope.get("parsed") == {"status": "active", "code": 200}
+
+        # Array Operation (Push)
+        res_arr = registry.execute_action(
+            action=FlowActionType.ARRAY_OP,
+            session_id="sess-1",
+            config={"operation": "push", "array": ["alpha", "beta"], "item": "gamma", "output_variable": "new_arr"},
+            scope=scope,
+        )
+        assert res_arr.status == "passed"
+        assert scope.get("new_arr") == ["alpha", "beta", "gamma"]
+
+    def test_switch_action_routing(self, mock_adapter: MagicMock) -> None:
+        registry = ActionRegistry(mock_adapter)
+        scope = VariableScope(initial_vars={"env": "production"})
+
+        res = registry.execute_action(
+            action=FlowActionType.SWITCH,
+            session_id="sess-1",
+            config={"expression": "{{env}}", "cases": ["staging", "production", "dev"]},
+            scope=scope,
+        )
+        assert res.status == "passed"
+        assert res.next_handle == "production"
+
 
 class TestFlowExecutor:
     """Tests for DAG workflow execution and step logging."""

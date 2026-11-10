@@ -84,10 +84,11 @@ export const flowsApi = {
   list: (projectId?: string) =>
     request<any[]>(`/api/v1/flows${projectId ? `?project_id=${projectId}` : ""}`),
   get: (id: string) => request<any>(`/api/v1/flows/${id}`),
-  create: (data: { project_id: string; name: string; description?: string; definition: any }) =>
-    request<any>("/api/v1/flows", { method: "POST", body: data }),
-  update: (id: string, data: { name?: string; description?: string; definition?: any }) =>
-    request<any>(`/api/v1/flows/${id}`, { method: "PUT", body: data }),
+  getTemplates: () => request<any[]>("/api/v1/flows/templates"),
+  create: (data: { project_id: string; name: string; description?: string; definition?: any; flow_graph?: any }) =>
+    request<any>("/api/v1/flows", { method: "POST", body: { ...data, definition: data.definition || data.flow_graph } }),
+  update: (id: string, data: { name?: string; description?: string; definition?: any; flow_graph?: any }) =>
+    request<any>(`/api/v1/flows/${id}`, { method: "PUT", body: { ...data, definition: data.definition || data.flow_graph } }),
   publish: (id: string) => request<any>(`/api/v1/flows/${id}/publish`, { method: "POST" }),
   execute: (id: string, data?: { version_id?: string; initial_variables?: Record<string, any> }) =>
     request<any>(`/api/v1/flows/${id}/execute`, { method: "POST", body: data || {} }),
@@ -107,6 +108,12 @@ export const testsApi = {
     request<any>(`/api/v1/tests/${id}/execute`, { method: "POST", body: data || {} }),
   seedLegacy: (projectId: string) =>
     request<any[]>("/api/v1/tests/seed-legacy", { method: "POST", body: { project_id: projectId } }),
+  listDatasets: (projectId?: string) =>
+    request<any[]>(`/api/v1/tests/datasets${projectId ? `?project_id=${projectId}` : ""}`),
+  createDataset: (data: { project_id: string; name: string; description?: string; format?: string; headers: string[]; rows: any[] }) =>
+    request<any>("/api/v1/tests/datasets", { method: "POST", body: data }),
+  deleteDataset: (id: string) =>
+    request<void>(`/api/v1/tests/datasets/${id}`, { method: "DELETE" }),
 };
 
 export const testSuitesApi = {
@@ -159,6 +166,12 @@ export const projectsApi = {
   get: (id: string) => request<any>(`/api/v1/projects/${id}`),
   create: (data: { name: string; description?: string }) =>
     request<any>("/api/v1/projects", { method: "POST", body: data }),
+  listMembers: (projectId: string) =>
+    request<any[]>(`/api/v1/projects/${projectId}/members`),
+  addMember: (projectId: string, data: { user_id: string; role: string }) =>
+    request<any>(`/api/v1/projects/${projectId}/members`, { method: "POST", body: data }),
+  removeMember: (projectId: string, userId: string) =>
+    request<void>(`/api/v1/projects/${projectId}/members/${userId}`, { method: "DELETE" }),
 };
 
 export const environmentsApi = {
@@ -177,10 +190,38 @@ export const credentialsApi = {
     request<void>(`/api/v1/credentials/${id}`, { method: "DELETE" }),
 };
 
-// 7. Browser Engine
+// 7. Browser Engine & Interactive Sessions
 export const browserApi = {
   getStatus: () => request<any>("/api/v1/browser/status"),
   testConnection: () => request<any>("/api/v1/browser/test-connection", { method: "POST" }),
+  launch: (data?: { project_id?: string; session_id?: string; allowed_domains?: string[] }) =>
+    request<any>("/api/v1/browser/launch", { method: "POST", body: data || {} }),
+  navigate: (sessionId: string, url: string, timeout = 30) =>
+    request<any>("/api/v1/browser/navigate", { method: "POST", body: { session_id: sessionId, url, timeout } }),
+  action: (sessionId: string, data: { action: string; selector?: string; text?: string; value?: string; timeout?: number }) =>
+    request<any>("/api/v1/browser/action", { method: "POST", body: { session_id: sessionId, ...data } }),
+  screenshot: (sessionId: string, data?: { custom_name?: string; full_page?: boolean }) =>
+    request<any>("/api/v1/browser/screenshot", { method: "POST", body: { session_id: sessionId, ...data } }),
+  getViewport: (sessionId: string) =>
+    request<any>(`/api/v1/browser/viewport/${sessionId}`),
+  close: (sessionId: string) =>
+    request<any>("/api/v1/browser/close", { method: "POST", body: { session_id: sessionId } }),
+};
+
+// 7b. Browser Recorder
+export const recorderApi = {
+  start: (projectId: string, targetUrl: string) =>
+    request<any>("/api/v1/recorder/start", { method: "POST", body: { project_id: projectId, target_url: targetUrl } }),
+  status: (sessionId: string) =>
+    request<any>(`/api/v1/recorder/status?session_id=${sessionId}`),
+  recordAction: (sessionId: string, action: string, selector = "", value?: string) =>
+    request<any>("/api/v1/recorder/action", { method: "POST", body: { session_id: sessionId, action, selector, value } }),
+  stop: (sessionId: string) =>
+    request<any>("/api/v1/recorder/stop", { method: "POST", body: { session_id: sessionId } }),
+  inspect: (sessionId: string) =>
+    request<{ session_id: string; elements_count: number; elements: any[] }>(`/api/v1/recorder/inspect/${sessionId}`),
+  save: (data: { session_id: string; project_id: string; name: string; target_type: "test" | "flow"; description?: string }) =>
+    request<any>("/api/v1/recorder/save", { method: "POST", body: data }),
 };
 
 // 8. Schedules

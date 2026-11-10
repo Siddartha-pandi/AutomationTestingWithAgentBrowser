@@ -1,6 +1,0 @@
-{
-  "page_title": "Login Portal",
-  "total_elements": 42,
-  "secret_token": "[REDACTED_SECRET]",
-  "body": "<button>Submit</button>"
-}

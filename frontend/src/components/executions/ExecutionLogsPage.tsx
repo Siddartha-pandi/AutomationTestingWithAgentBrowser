@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Terminal,
   Search,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../common/ToastProvider";
 import { NavView } from "../layout/AppShell";
+import { executionsApi } from "@/api";
 
 interface ExecutionLogsPageProps {
   projectId: string;
@@ -31,72 +32,43 @@ interface LogEntry {
 }
 
 export function ExecutionLogsPage({ projectId, onNavigate }: ExecutionLogsPageProps) {
-  const [logs, setLogs] = useState<LogEntry[]>([
-    {
-      id: "l1",
-      timestamp: "2026-11-10 09:14:02.110",
-      level: "INFO",
-      execution_id: "exec-901a",
-      message: "Agent Browser CLI daemon spawned with isolated sandbox flags.",
-      is_redacted: true,
-    },
-    {
-      id: "l2",
-      timestamp: "2026-11-10 09:14:02.145",
-      level: "DEBUG",
-      execution_id: "exec-901a",
-      message: "Target domain 'staging.internal.company.net' matches project environment security whitelist.",
-      is_redacted: true,
-    },
-    {
-      id: "l3",
-      timestamp: "2026-11-10 09:14:02.820",
-      level: "INFO",
-      execution_id: "exec-901a",
-      message: "Navigation to 'https://staging.internal.company.net/auth' completed with status 200.",
-      is_redacted: true,
-    },
-    {
-      id: "l4",
-      timestamp: "2026-11-10 09:14:03.360",
-      level: "INFO",
-      execution_id: "exec-901a",
-      message: "Input filled into 'login_email_input' with parameter value [REDACTED_EMAIL].",
-      is_redacted: true,
-    },
-    {
-      id: "l5",
-      timestamp: "2026-11-10 09:14:03.410",
-      level: "DEBUG",
-      execution_id: "exec-901a",
-      message: "Input filled into 'login_password_input' with parameter value [REDACTED_PASSWORD].",
-      is_redacted: true,
-    },
-    {
-      id: "l6",
-      timestamp: "2026-11-10 09:14:03.820",
-      level: "INFO",
-      execution_id: "exec-901a",
-      message: "Multi-factor locator matched 'button[data-testid='referral-submit-action']' with 98.4% confidence.",
-      is_redacted: true,
-    },
-    {
-      id: "l7",
-      timestamp: "2026-11-10 09:14:04.220",
-      level: "WARNING",
-      execution_id: "exec-902b",
-      message: "DOM element 'button#old-submit' took 2.4s to settle before action trigger.",
-      is_redacted: true,
-    },
-    {
-      id: "l8",
-      timestamp: "2026-11-10 09:14:04.910",
-      level: "ERROR",
-      execution_id: "exec-904d",
-      message: "Assertion failed: Expected element '.modal-alert-error' to be visible, but element was hidden.",
-      is_redacted: true,
-    },
-  ]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadLogs();
+  }, [projectId]);
+
+  const loadLogs = async () => {
+    setLoading(true);
+    try {
+      const execs = await executionsApi.list({ projectId });
+      if (execs && execs.length > 0) {
+        const collectedLogs: LogEntry[] = [];
+        for (const ex of execs.slice(0, 5)) {
+          if (Array.isArray(ex.logs)) {
+            for (let idx = 0; idx < ex.logs.length; idx++) {
+              collectedLogs.push({
+                id: `log-${ex.id}-${idx}`,
+                timestamp: ex.created_at || "Recent",
+                level: "INFO",
+                execution_id: String(ex.id),
+                message: typeof ex.logs[idx] === "string" ? ex.logs[idx] : JSON.stringify(ex.logs[idx]),
+                is_redacted: true,
+              });
+            }
+          }
+        }
+        setLogs(collectedLogs);
+      } else {
+        setLogs([]);
+      }
+    } catch {
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [levelFilter, setLevelFilter] = useState<string>("all");

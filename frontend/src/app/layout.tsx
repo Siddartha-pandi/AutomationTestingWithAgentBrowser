@@ -6,8 +6,8 @@ import { ConfirmProvider } from "@/components/common/ConfirmModal";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "AutomationTestingWithAgentBrowser | Enterprise Flow & Test Automation",
-  description: "Enterprise multi-user platform for browser flow automation, deterministic testing, DOM inspection and rule-based self-healing.",
+  title: "Enterprise Browser Automation & Deterministic Testing Platform",
+  description: "Enterprise SaaS platform for visual browser flow automation, deterministic testing, DOM inspection, and rule-based self-healing with Zero-AI company data guarantee.",
 };
 
 export default function RootLayout({

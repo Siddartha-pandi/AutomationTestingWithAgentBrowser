@@ -73,72 +73,21 @@ export const VisualTestBuilder: React.FC<VisualTestBuilderProps> = ({
   projectId,
   testCaseId,
   initialDefinition,
-  testName = "User Login & KYC Verification Test",
+  testName = "New Test Case",
   onSaveSuccess,
 }) => {
   const [name, setName] = useState(testName);
   const [description, setDescription] = useState(
-    initialDefinition?.description || "Deterministic assertion of signup redirect, 2FA code entry and welcome banner."
+    initialDefinition?.description || ""
   );
   const [environment, setEnvironment] = useState("Staging");
-  const [testDataRow, setTestDataRow] = useState('{"username": "test_qa@company.internal", "role": "Standard"}');
+  const [testDataRow, setTestDataRow] = useState("{}");
 
   const [steps, setSteps] = useState<any[]>(
-    initialDefinition?.steps || [
-      {
-        id: "step_1",
-        step_type: "action",
-        action: "navigate",
-        name: "Navigate to Staging Portal",
-        config: { url: "https://staging.internal.company.net/auth" },
-      },
-      {
-        id: "step_2",
-        step_type: "action",
-        action: "fill",
-        name: "Fill Corporate Email",
-        config: { logical_id: "login_email_input", value: "admin@company.internal" },
-      },
-      {
-        id: "step_3",
-        step_type: "action",
-        action: "click",
-        name: "Click Submit Login",
-        config: { logical_id: "login_submit_btn" },
-      },
-      {
-        id: "step_4",
-        step_type: "assertion",
-        assertion: "url_contains",
-        name: "Assert URL Contains Dashboard",
-        expected: "/dashboard",
-        actual: "/dashboard",
-        status: "passed",
-      },
-      {
-        id: "step_5",
-        step_type: "assertion",
-        assertion: "element_visible",
-        name: "Assert Welcome Banner Visible",
-        target: "#welcome-banner",
-        expected: "Visible in viewport",
-        actual: "Visible (computed rect 1200x80)",
-        status: "passed",
-      },
-      {
-        id: "step_6",
-        step_type: "assertion",
-        assertion: "text_contains",
-        name: "Assert Role Badge Text",
-        target: "#user-role-badge",
-        expected: "Owner",
-        actual: "Owner",
-        status: "passed",
-      },
-    ]
+    initialDefinition?.steps || []
   );
 
-  const [selectedStepId, setSelectedStepId] = useState<string>("step_4");
+  const [selectedStepId, setSelectedStepId] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [testResult, setTestResult] = useState<any | null>(null);

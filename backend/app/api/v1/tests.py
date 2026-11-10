@@ -17,7 +17,8 @@ from backend.app.engine.testing.test_runner import TestRunner
 from backend.app.engine.testing.test_schema import TestCaseDefinition
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.execution import Execution
-from backend.app.models.project import Project
+from backend.app.models.project import Project, ProjectMember, TestDataset
+from pydantic import BaseModel, ConfigDict, Field
 from backend.app.api.v1.projects import resolve_project_id
 from backend.app.schemas.flows import ExecutionDetailResponse, PublishVersionResponse
 from backend.app.schemas.testing import (
@@ -119,9 +120,21 @@ def list_test_cases(
         .options(joinedload(AutomationDefinition.versions))
     )
     if project_id:
-        proj = resolve_project_id(db, project_id)
+        proj = resolve_project_id(db, project_id, current_user.id)
         if proj:
             query = query.filter(AutomationDefinition.project_id == proj.id)
+        else:
+            return []
+    elif not getattr(current_user, "is_superuser", False):
+        user_projects = (
+            db.query(Project.id)
+            .filter(
+                (Project.owner_id == current_user.id)
+                | (Project.members.any(ProjectMember.user_id == current_user.id))
+            )
+            .subquery()
+        )
+        query = query.filter(AutomationDefinition.project_id.in_(user_projects))
 
     tests = query.order_by(AutomationDefinition.updated_at.desc()).offset(offset).limit(limit).all()
     results = []
@@ -144,6 +157,97 @@ def list_test_cases(
             )
         )
     return results
+
+
+class TestDatasetCreate(BaseModel):
+    project_id: str | UUID
+    name: str = Field(min_length=1, max_length=160)
+    description: str | None = None
+    format: str = "json"
+    headers: list[str] = Field(default_factory=list)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class TestDatasetResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    name: str
+    description: str | None = None
+    format: str
+    headers: list[str]
+    rows: list[dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.post("/datasets", response_model=TestDatasetResponse, status_code=status.HTTP_201_CREATED)
+def create_test_dataset(
+    payload: TestDatasetCreate,
+    current_user=Depends(require_permission("tests:create_edit")),
+    db: Session = Depends(get_db),
+) -> TestDatasetResponse:
+    """Creates a new test dataset for parameterized testing."""
+    proj = resolve_project_id(db, payload.project_id, current_user.id)
+    if not proj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    dataset = TestDataset(
+        project_id=proj.id,
+        name=payload.name,
+        description=payload.description,
+        format=payload.format,
+        headers=payload.headers,
+        rows=payload.rows,
+        created_by=current_user.id,
+    )
+    db.add(dataset)
+    db.commit()
+    db.refresh(dataset)
+    return TestDatasetResponse.model_validate(dataset)
+
+
+@router.get("/datasets", response_model=list[TestDatasetResponse])
+def list_test_datasets(
+    project_id: str | None = None,
+    current_user=Depends(require_permission("tests:read", "tests:create_edit", "reports:read")),
+    db: Session = Depends(get_db),
+) -> list[TestDatasetResponse]:
+    """Lists all parameterized datasets for a project."""
+    query = db.query(TestDataset)
+    if project_id:
+        proj = resolve_project_id(db, project_id, current_user.id)
+        if proj:
+            query = query.filter(TestDataset.project_id == proj.id)
+        else:
+            return []
+    elif not getattr(current_user, "is_superuser", False):
+        user_projects = (
+            db.query(Project.id)
+            .filter(
+                (Project.owner_id == current_user.id)
+                | (Project.members.any(ProjectMember.user_id == current_user.id))
+            )
+            .subquery()
+        )
+        query = query.filter(TestDataset.project_id.in_(user_projects))
+    datasets = query.order_by(TestDataset.updated_at.desc()).all()
+    return [TestDatasetResponse.model_validate(d) for d in datasets]
+
+
+@router.delete("/datasets/{dataset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_test_dataset(
+    dataset_id: UUID,
+    current_user=Depends(require_permission("tests:create_edit")),
+    db: Session = Depends(get_db),
+):
+    """Deletes a test dataset."""
+    dataset = db.query(TestDataset).filter(TestDataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    db.delete(dataset)
+    db.commit()
 
 
 @router.get("/{test_id}", response_model=TestCaseResponse)

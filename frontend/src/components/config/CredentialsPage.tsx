@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   KeyRound,
   Plus,
@@ -20,6 +20,7 @@ import {
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
 import { NavView } from "../layout/AppShell";
+import { credentialsApi } from "@/api";
 
 interface CredentialsPageProps {
   projectId: string;
@@ -38,38 +39,39 @@ interface CredentialItem {
 }
 
 export function CredentialsPage({ projectId, onNavigate }: CredentialsPageProps) {
-  const [credentials, setCredentials] = useState<CredentialItem[]>([
-    {
-      id: "cred-01",
-      name: "Staging Lead Administrator Account",
-      credential_type: "username_password",
-      username: "admin@company.internal",
-      domain_scope: "staging.internal.company.net",
-      environment_assignment: "Staging",
-      last_updated: "2026-11-09",
-      is_active: true,
-    },
-    {
-      id: "cred-02",
-      name: "Payment Gateway Sandbox API Secret",
-      credential_type: "api_token",
-      username: "api_key_sandbox_99",
-      domain_scope: "*.stripe.com, *.adyen.com",
-      environment_assignment: "Staging, Testing",
-      last_updated: "2026-11-08",
-      is_active: true,
-    },
-    {
-      id: "cred-03",
-      name: "Production Read-Only Auditor Token",
-      credential_type: "bearer_token",
-      username: "auditor_token_vault",
-      domain_scope: "app.company.internal",
-      environment_assignment: "Production",
-      last_updated: "2026-11-01",
-      is_active: true,
-    },
-  ]);
+  const [credentials, setCredentials] = useState<CredentialItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadCredentials();
+  }, [projectId]);
+
+  const loadCredentials = async () => {
+    setLoading(true);
+    try {
+      const list = await credentialsApi.list(projectId);
+      if (list && list.length > 0) {
+        setCredentials(
+          list.map((c: any) => ({
+            id: String(c.id),
+            name: c.name,
+            credential_type: c.credential_type || "username_password",
+            username: c.username || "",
+            domain_scope: c.domain_scope || "*",
+            environment_assignment: "Active",
+            last_updated: c.created_at ? c.created_at.split("T")[0] : "Recent",
+            is_active: true,
+          }))
+        );
+      } else {
+        setCredentials([]);
+      }
+    } catch {
+      setCredentials([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

@@ -105,6 +105,43 @@ class CommandExecutor:
         # Fallback to direct name (will raise BrowserNotFoundError on execution if missing)
         return "agent-browser.cmd" if os.name == "nt" else "agent-browser"
 
+    @classmethod
+    def _resolve_executable_path(cls) -> str | None:
+        """Locates system Chrome/Chromium executable on Windows or Linux."""
+        candidate = (
+            os.getenv("AGENT_BROWSER_EXECUTABLE_PATH")
+            or os.getenv("CHROME_BIN")
+            or os.getenv("CHROMIUM_PATH")
+        )
+        if candidate and (Path(candidate).exists() or shutil.which(candidate)):
+            return str(candidate)
+
+        # Linux common paths
+        if os.name != "nt":
+            for p in (
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+                "/snap/bin/chromium",
+            ):
+                if Path(p).exists() or shutil.which(p):
+                    return p
+
+        # Windows common paths
+        if os.name == "nt":
+            for env_key in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+                base = os.environ.get(env_key)
+                if base:
+                    for rel in (
+                        "Google/Chrome/Application/chrome.exe",
+                        "Microsoft/Edge/Application/msedge.exe",
+                    ):
+                        target = Path(base) / rel
+                        if target.exists():
+                            return str(target)
+        return None
+
     def execute(
         self,
         args: list[str],
@@ -138,6 +175,9 @@ class CommandExecutor:
         cmd = [self.cli_path]
         if session_id:
             cmd.extend(["--session", session_id])
+        exec_path = self._resolve_executable_path()
+        if exec_path and "--executable-path" not in args:
+            cmd.extend(["--executable-path", exec_path])
         if parse_json and "--json" not in args:
             cmd.append("--json")
         cmd.extend(args)
@@ -224,6 +264,31 @@ class CommandExecutor:
         # Classify errors
         if returncode != 0:
             error_text = f"{stderr} {stdout}".lower()
+
+            # Automatic recovery: install Chrome if missing and retry once
+            if ("chrome not found" in error_text or "auto-launch failed" in error_text) and not getattr(self, "_install_attempted", False):
+                self._install_attempted = True
+                logger.warning("Chrome not found for agent-browser. Running 'agent-browser install'...")
+                try:
+                    install_proc = subprocess.run(
+                        [self.cli_path, "install"],
+                        timeout=180,
+                        capture_output=True,
+                        text=True,
+                        env=env,
+                    )
+                    logger.info("agent-browser install finished with exit code %s", install_proc.returncode)
+                    return self.execute(
+                        args=args,
+                        session_id=session_id,
+                        timeout=timeout,
+                        parse_json=parse_json,
+                        extra_env=extra_env,
+                        stdin_input=stdin_input,
+                    )
+                except Exception as install_err:
+                    logger.error("Automatic agent-browser install failed: %s", install_err)
+
             if any(term in error_text for term in ["element not found", "no element", "cannot find", "ambiguous"]):
                 selector_hint = args[1] if len(args) > 1 else "unknown"
                 raise ElementNotFoundError(

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Globe,
   Plus,
@@ -17,6 +17,7 @@ import {
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
 import { NavView } from "../layout/AppShell";
+import { environmentsApi } from "@/api";
 
 interface EnvironmentsPageProps {
   projectId: string;
@@ -35,48 +36,39 @@ interface EnvironmentItem {
 }
 
 export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProps) {
-  const [environments, setEnvironments] = useState<EnvironmentItem[]>([
-    {
-      id: "env-dev",
-      name: "Development",
-      base_url: "http://127.0.0.1:3000",
-      description: "Local development server and mock APIs.",
-      status: "healthy",
-      allowed_domains: ["localhost", "127.0.0.1"],
-      is_production: false,
-      variables: { API_PORT: "8000", MOCK_AUTH: "true" },
-    },
-    {
-      id: "env-test",
-      name: "Testing",
-      base_url: "https://qa.internal.company.net",
-      description: "QA automated regression server with seeded synthetic test databases.",
-      status: "healthy",
-      allowed_domains: ["qa.internal.company.net", "auth.internal.company.net"],
-      is_production: false,
-      variables: { TEST_SUITE_CONCURRENCY: "4" },
-    },
-    {
-      id: "env-staging",
-      name: "Staging",
-      base_url: "https://staging.internal.company.net",
-      description: "Pre-release staging replica with production-identical configurations.",
-      status: "healthy",
-      allowed_domains: ["staging.internal.company.net", "auth.internal.company.net"],
-      is_production: false,
-      variables: { GATEWAY_TIMEOUT: "30" },
-    },
-    {
-      id: "env-prod",
-      name: "Production",
-      base_url: "https://app.company.internal",
-      description: "Guarded live production environment. Strict secondary confirmation required for all runs.",
-      status: "guarded",
-      allowed_domains: ["app.company.internal", "sso.company.internal"],
-      is_production: true,
-      variables: { STRICT_AUDIT: "true", ENFORCE_2FA: "true" },
-    },
-  ]);
+  const [environments, setEnvironments] = useState<EnvironmentItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadEnvironments();
+  }, [projectId]);
+
+  const loadEnvironments = async () => {
+    setLoading(true);
+    try {
+      const list = await environmentsApi.list(projectId);
+      if (list && list.length > 0) {
+        setEnvironments(
+          list.map((e: any) => ({
+            id: String(e.id),
+            name: e.name,
+            base_url: e.base_url,
+            description: `Configured execution environment for ${e.name}`,
+            status: e.name.toLowerCase().includes("prod") ? "guarded" : "healthy",
+            allowed_domains: e.allowed_domains || [],
+            is_production: e.name.toLowerCase().includes("prod"),
+            variables: {},
+          }))
+        );
+      } else {
+        setEnvironments([]);
+      }
+    } catch {
+      setEnvironments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [nameInput, setNameInput] = useState("Custom Pre-Prod");

@@ -27,7 +27,7 @@ def get_postgres_url() -> str:
     """Retrieves and standardizes the PostgreSQL connection URL for psycopg 3."""
     raw_url = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@127.0.0.1:5432/obscura",
+        "postgresql://postgres:postgres@127.0.0.1:5432/automation_platform_db",
     ).strip()
 
     # Normalize driver prefix for SQLAlchemy + psycopg

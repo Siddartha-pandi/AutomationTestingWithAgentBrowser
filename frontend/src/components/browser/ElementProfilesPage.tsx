@@ -41,54 +41,41 @@ interface ElementProfileItem {
 }
 
 export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPageProps) {
-  const [profiles, setProfiles] = useState<ElementProfileItem[]>([
-    {
-      id: "ep-1",
-      logical_id: "referral_submit_btn",
-      description: "Primary submit action on customer referral creation modal",
-      page_context: "Referral Dashboard",
-      element_type: "button",
-      recognition_strategy: "Deterministic Multi-Factor (Levenshtein + ARIA)",
-      last_successful_match: "10 mins ago (98.2% confidence)",
-      last_updated: "2026-11-10",
-      status: "verified",
-      locators: [
-        { type: "role_name", value: "button[name='Send Referral']", success_count: 142 },
-        { type: "data_testid", value: "[data-testid='referral-submit-action']", success_count: 98 },
-        { type: "css_id", value: "#submit-referral-btn", success_count: 34 },
-      ],
-    },
-    {
-      id: "ep-2",
-      logical_id: "user_email_input",
-      description: "Corporate login email input with autocomplete",
-      page_context: "Authentication Login",
-      element_type: "input",
-      recognition_strategy: "Stable Attribute + Accessible Name",
-      last_successful_match: "1 hour ago (100% confidence)",
-      last_updated: "2026-11-10",
-      status: "verified",
-      locators: [
-        { type: "role_name", value: "textbox[name='Corporate Email']", success_count: 220 },
-        { type: "stable_attr", value: "input[type='email']#user-email-field", success_count: 180 },
-      ],
-    },
-    {
-      id: "ep-3",
-      logical_id: "kyc_upload_dropzone",
-      description: "Document file dropzone for government photo ID",
-      page_context: "KYC Verification",
-      element_type: "div",
-      recognition_strategy: "Structural Fingerprint & Context",
-      last_successful_match: "Yesterday (89.4% confidence - Healed)",
-      last_updated: "2026-11-09",
-      status: "mutated",
-      locators: [
-        { type: "css_id", value: "#kyc-dropzone-v2", success_count: 12 },
-        { type: "structural", value: "div.upload-zone:has(input[type=file])", success_count: 45 },
-      ],
-    },
-  ]);
+  const [profiles, setProfiles] = useState<ElementProfileItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [projectId]);
+
+  const loadProfiles = async () => {
+    setLoading(true);
+    try {
+      const list = await intelligenceApi.listElements(projectId);
+      if (list && list.length > 0) {
+        setProfiles(
+          list.map((el: any) => ({
+            id: String(el.id),
+            logical_id: el.logical_name || el.logical_id || "element_target",
+            description: el.description || "Profiled DOM element",
+            page_context: el.page_context || "Default Context",
+            element_type: el.element_type || "element",
+            recognition_strategy: "Deterministic Multi-Factor (Levenshtein + ARIA)",
+            last_successful_match: "Recent",
+            last_updated: el.created_at ? el.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+            status: "verified",
+            locators: el.locators || (el.selector ? [{ type: "primary_selector", value: el.selector, success_count: 1 }] : []),
+          }))
+        );
+      } else {
+        setProfiles([]);
+      }
+    } catch {
+      setProfiles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<ElementProfileItem | null>(null);

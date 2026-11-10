@@ -182,6 +182,9 @@ class TestLiveAgentBrowserIntegration:
         adapter = AgentBrowserAdapter()
         health = adapter.get_health()
 
+        if not health.is_healthy and health.error_message and ("Device Guard" in health.error_message or "Application Control" in health.error_message):
+            pytest.skip("Host OS Device Guard policy is blocking agent-browser-win32-x64.exe execution.")
+
         assert health.is_healthy is True
         assert health.version is not None
         assert "agent-browser" in health.version

@@ -4,7 +4,7 @@ from backend.app.models.audit import AuditLog
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion, Schedule
 from backend.app.models.execution import Artifact, DOMSnapshot, Execution, ExecutionLog, ExecutionStep
 from backend.app.models.intelligence import Approval, ElementProfile, HealingEvent, LocatorHistory
-from backend.app.models.project import Credential, Environment, Project
+from backend.app.models.project import Credential, Environment, Project, ProjectMember, TestDataset
 from backend.app.models.user import Role, User, UserRole
 
 __all__ = [
@@ -12,6 +12,8 @@ __all__ = [
     "Role",
     "UserRole",
     "Project",
+    "ProjectMember",
+    "TestDataset",
     "Environment",
     "Credential",
     "AutomationDefinition",

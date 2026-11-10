@@ -37,48 +37,7 @@ interface ScreenshotItem {
 }
 
 export function ScreenshotsGalleryPage({ projectId, onNavigate }: ScreenshotsGalleryPageProps) {
-  const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([
-    {
-      id: "sc-01",
-      name: "dashboard_post_login.png",
-      execution_id: "exec-901a",
-      step_name: "Capture Post-Login Viewport",
-      timestamp: "Today at 09:14 AM",
-      environment: "Staging",
-      size_kb: 142,
-      url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%230f172a'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-family='sans-serif' font-size='18' font-weight='bold'>Dashboard Post-Login State</text></svg>",
-    },
-    {
-      id: "sc-02",
-      name: "3ds_challenge_pin_frame.png",
-      execution_id: "exec-902b",
-      step_name: "Assert 3DS Frame Loaded",
-      timestamp: "Today at 08:31 AM",
-      environment: "Production",
-      size_kb: 215,
-      url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%231e293b'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2310b981' font-family='sans-serif' font-size='18' font-weight='bold'>3DS Challenge Viewport</text></svg>",
-    },
-    {
-      id: "sc-03",
-      name: "kyc_error_boundary_alert.png",
-      execution_id: "exec-904d",
-      step_name: "Verify KYC Upload Size Limitation",
-      timestamp: "Yesterday at 04:20 PM",
-      environment: "Testing",
-      size_kb: 98,
-      url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%23450a0a'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23f87171' font-family='sans-serif' font-size='18' font-weight='bold'>KYC Size Limit Alert Modal</text></svg>",
-    },
-    {
-      id: "sc-04",
-      name: "partner_referral_table_page1.png",
-      execution_id: "exec-903c",
-      step_name: "Extract Tabular Referrals",
-      timestamp: "Today at 07:45 AM",
-      environment: "Development",
-      size_kb: 312,
-      url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%230b132b'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2360a5fa' font-family='sans-serif' font-size='18' font-weight='bold'>Partner Referral Metrics Table</text></svg>",
-    },
-  ]);
+  const [screenshots, setScreenshots] = useState<ScreenshotItem[]>([]);
 
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");

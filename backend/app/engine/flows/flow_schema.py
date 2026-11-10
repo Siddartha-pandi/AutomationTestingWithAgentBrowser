@@ -14,22 +14,47 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class FlowActionType(str, Enum):
-    """Supported deterministic browser and flow control actions."""
+    """Supported deterministic browser, logic, and data manipulation actions."""
 
+    # Browser Actions
     NAVIGATE = "navigate"
     CLICK = "click"
     DOUBLE_CLICK = "double_click"
+    RIGHT_CLICK = "right_click"
+    HOVER = "hover"
     FILL = "fill"
     TYPE = "type"
     SELECT = "select"
+    CHECK = "check"
+    UNCHECK = "uncheck"
+    SCROLL = "scroll"
     EXTRACT_TEXT = "extract_text"
     EXTRACT_ATTRIBUTE = "extract_attribute"
     EXTRACT_TABLE = "extract_table"
     WAIT = "wait"
-    CONDITION = "condition"
-    LOOP = "loop"
-    SET_VARIABLE = "set_variable"
+    WAIT_UNTIL = "wait_until"
+    BROWSER_BACK = "browser_back"
+    BROWSER_FORWARD = "browser_forward"
+    REFRESH = "refresh"
     SCREENSHOT = "screenshot"
+
+    # Logic & Flow Control Actions
+    CONDITION = "condition"
+    SWITCH = "switch"
+    LOOP = "loop"
+    WHILE_LOOP = "while_loop"
+    BREAK = "break"
+    CONTINUE = "continue"
+
+    # Data Actions
+    SET_VARIABLE = "set_variable"
+    STRING_OP = "string_operation"
+    NUMBER_OP = "number_operation"
+    JSON_OP = "json_operation"
+    DATE_OP = "date_operation"
+    ARRAY_OP = "array_operation"
+
+    # Control Actions
     APPROVAL_GATE = "approval_gate"
     STOP = "stop"
 

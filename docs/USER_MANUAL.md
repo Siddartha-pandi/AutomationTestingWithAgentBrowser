@@ -241,38 +241,65 @@ The Visual Flow Builder allows users to construct complex, multi-step browser au
 
 ![Visual Flow Builder](images/ui_visual_flow_builder.svg)
 
-#### Canvas Node Types:
-- **Start Trigger Node:** Initializes execution context and generates a unique session UUID.
-- **Navigate (Open URL):** Navigates the browser to the destination URL with configurable page-load timeout.
-- **Click Element:** Dispatches native mouse clicks with pre-action visibility checks.
-- **Fill Input:** Enters text into form inputs, textareas, and rich controls.
-- **Fill Secret (AES-256):** Securely injects decrypted credentials via in-memory pipes without revealing plain text in logs or system processes.
-- **Select Option:** Selects dropdown choices by value, label, or index.
-- **Wait / Delay:** Introduces explicit DOM condition waits or sleep intervals.
-- **Capture Screenshot:** Records full-page or element-specific PNG snapshots.
-- **Condition Branch (If/Else):** Evaluates runtime conditions (e.g., URL contains `/dashboard`) and routes execution down separate branch paths.
-- **For Each / Data Loop:** Iterates over rows from CSV/JSON datasets.
-- **Circuit Breaker Node:** Halts execution if repeated failures exceed configurable thresholds.
+#### 1. Categorized Action Catalog (30+ Deterministic Actions):
+- **Browser Navigation:** `navigate`, `browser_back`, `browser_forward`, `refresh`.
+- **Browser Interaction:** `click`, `double_click`, `right_click`, `hover`, `fill`, `type`, `select`, `check`, `uncheck`, `scroll`.
+- **Browser Synchronization & Capture:** `wait`, `wait_until` (visibility, hidden, enabled conditions), `screenshot`.
+- **DOM Extraction:** `extract_text`, `extract_attribute`, `extract_table`.
+- **Logic & Control Flow:** `condition` (If/Else with true/false branch handles), `switch` (multi-case routing), `loop` (for-each array iteration), `while_loop`, `break`, `continue`.
+- **Data Operations:** `set_variable`, `string_operation` (upper, lower, trim, replace, split, length), `number_operation` (add, subtract, multiply, divide, round, abs, min, max), `json_operation` (parse, stringify, get_key), `date_operation` (now, timestamp, format, add_days), `array_operation` (length, push, join, slice).
+- **Governance & Control:** `approval_gate` (Tier-2 human-in-the-loop signoff), `stop` (graceful termination).
+
+#### 2. Pre-Built Flow Templates:
+**Route / Nav:** `automation_templates`
+Pre-engineered reference workflows are available for one-click cloning:
+- **Enterprise Login & Session Verification:** Navigates login form, injects vaulted credentials, verifies cookies, captures post-login DOM.
+- **Multi-Step Form Wizard & Lead Creation:** Handles sequential tabs, required fields, dropdown selections, and form submission.
+- **Dynamic Table Scraper & Validator:** Evaluates dynamic DOM tables into structured arrays and asserts data integrity.
+- **FVR System Status & Health Audit:** Extracts badges, verifies operational status, and halts on alert discrepancies.
 
 ---
 
-### 6.3 Live Browser & DOM Explorer
-**Route / Nav:** `browser_live`, `browser_dom`, `browser_profiles`
+### 6.3 Live Browser, DOM Explorer & Browser Recorder
+**Route / Nav:** `browser_live`, `browser_dom`, `browser_profiles`, `browser_recorder`
 
-The Live Browser and DOM Explorer provides interactive inspection of target web applications using native `agent-browser` accessibility tree snapshots (`snapshot -i --json`).
+The Browser Intelligence module couples live inspection with native session recording:
 
 ![Live DOM Explorer](images/ui_live_browser_dom.svg)
 
-#### How to Inspect and Profile Elements:
+#### 1. Live DOM Explorer & Element Profiler:
 1. **Enter Target URL:** Input the target web application address into the top navigation bar.
 2. **Click "Capture Snapshot":** The backend spawns an isolated `agent-browser` daemon and extracts the interactive accessibility tree.
 3. **Reference Badges (`@e1`, `@e2`, ...):** Every interactive button, input, link, and select is tagged with an index reference.
 4. **Accessibility Tree View:** Inspect semantic roles (`textbox`, `button`, `combobox`), accessible names, focus states, and required flags.
 5. **Multi-Factor Element Profiler:** Click on any node to view its stability score, ARIA attributes, DOM ancestor path, and recommended deterministic selector hierarchy.
 
+#### 2. Native Interactive Browser Recorder:
+**Route / Nav:** `browser_recorder`
+Record real-time user browser interactions without fragile WebDriver hooks:
+- **Subprocess Session Coupling:** Uses native `agent-browser --session <uuid>` command stream.
+- **Action Capture:** Intercepts navigation, clicks, text typing, select changes, and scroll actions.
+- **Live Action Inspector:** Edit, reorder, or delete recorded actions before committing.
+- **Dual Export:** Save recordings directly as a runnable **Automation Flow** or a formal **Test Case**.
+
 ---
 
-### 6.4 Visual Test Builder & 13 Deterministic Assertions
+### 6.4 Visual Test Builder & Test Data Management
+**Route / Nav:** `testing_builder`, `testing_cases`, `testing_suites`, `testing_data`
+
+The Visual Test Builder transforms browser workflows into verifiable, deterministic test suites:
+
+![Visual Test Builder](images/ui_visual_test_builder.svg)
+
+#### 1. Test Data Management (Parameterized Datasets):
+**Route / Nav:** `testing_data`
+Manage data-driven test scenarios across environments without credential leakage:
+- **Data Matrix Editor:** Inline tabular editing of user credentials, form inputs, and expected outcomes.
+- **CSV & JSON Support:** Seamlessly import external datasets and export execution matrices.
+- **Secret Masking:** One-click toggling masks passwords and API tokens with dots (`••••••••`) to prevent screen-share leakage.
+- **Persistent Dataset Storage:** Datasets are saved in PostgreSQL `test_datasets` for automated binding during suite runs.
+
+#### 2. The 13 Deterministic Assertions:
 **Route / Nav:** `testing_builder`, `testing_cases`, `testing_suites`
 
 The Visual Test Builder transforms browser workflows into verifiable, deterministic test suites. Every test case contains sequential steps coupled with explicit assertion checks.
@@ -342,8 +369,10 @@ The execution engine provides complete visibility into every running and histori
 ### 6.7 Configuration (Projects, Environments, Credentials)
 **Route / Nav:** `config_projects`, `config_environments`, `config_credentials`, `config_browser`
 
-#### 1. Projects
+#### 1. Projects & Multi-Tenancy
 Organize automated tests into isolated enterprise workspaces. Projects maintain independent flows, suites, credentials, and audit logs.
+- **Project Members:** Assign team members per project (`admin`, `editor`, `runner`, `viewer`) with granular workspace isolation (`project_members`).
+- **Owner Governance:** Project creators manage member access and workspace settings.
 
 #### 2. Environments
 Define execution environments (`Development`, `Staging`, `UAT`, `Production`). Each environment specifies:

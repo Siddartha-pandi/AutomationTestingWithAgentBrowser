@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Download,
@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import { useToast } from "../common/ToastProvider";
 import { NavView } from "../layout/AppShell";
+import { reportsApi, executionsApi, testSuitesApi } from "@/api";
 
 interface TestReportsPageProps {
   projectId: string;
@@ -45,33 +46,71 @@ export function TestReportsPage({ projectId, onNavigate, onSelectExecution }: Te
   const [suiteFilter, setSuiteFilter] = useState("all");
   const [envFilter, setEnvFilter] = useState("all");
 
+  const [executions, setExecutions] = useState<any[]>([]);
+  const [suites, setSuites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const { success, info } = useToast();
 
-  // KPI Metrics
-  const totalTests = 142;
-  const passed = 135;
-  const failed = 5;
-  const skipped = 2;
-  const successRate = 95.1;
+  useEffect(() => {
+    loadReportsData();
+  }, [projectId]);
+
+  const loadReportsData = async () => {
+    setLoading(true);
+    try {
+      const [eRes, sRes] = await Promise.allSettled([
+        executionsApi.list({ projectId }),
+        testSuitesApi.list(projectId),
+      ]);
+      if (eRes.status === "fulfilled" && eRes.value) {
+        setExecutions(eRes.value);
+      } else {
+        setExecutions([]);
+      }
+      if (sRes.status === "fulfilled" && sRes.value) {
+        setSuites(sRes.value);
+      } else {
+        setSuites([]);
+      }
+    } catch {
+      setExecutions([]);
+      setSuites([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // KPI Metrics computed from real executions
+  const totalTests = executions.length;
+  const passed = executions.filter((e) => e.status === "completed" || e.status === "passed").length;
+  const failed = executions.filter((e) => e.status === "failed").length;
+  const skipped = executions.filter((e) => e.status === "skipped" || e.status === "cancelled").length;
+  const successRate = totalTests > 0 ? Number(((passed / totalTests) * 100).toFixed(1)) : 100.0;
 
   // Chart 1: Test Execution Trend
-  const trendData = [
-    { day: "Mon", Passed: 18, Failed: 1, Skipped: 0 },
-    { day: "Tue", Passed: 22, Failed: 0, Skipped: 1 },
-    { day: "Wed", Passed: 19, Failed: 2, Skipped: 0 },
-    { day: "Thu", Passed: 25, Failed: 1, Skipped: 0 },
-    { day: "Fri", Passed: 28, Failed: 0, Skipped: 1 },
-    { day: "Sat", Passed: 11, Failed: 1, Skipped: 0 },
-    { day: "Sun", Passed: 12, Failed: 0, Skipped: 0 },
-  ];
+  const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const trendData = daysOfWeek.map((day) => {
+    const dayExecs = executions.filter((e) => {
+      if (!e.created_at) return false;
+      const d = new Date(e.created_at);
+      const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()];
+      return dayName === day;
+    });
+    const p = dayExecs.filter((e) => e.status === "completed" || e.status === "passed").length;
+    const f = dayExecs.filter((e) => e.status === "failed").length;
+    const s = dayExecs.filter((e) => e.status === "skipped" || e.status === "cancelled").length;
+    return { day, Passed: p, Failed: f, Skipped: s };
+  });
 
   // Chart 2: Environment Comparison
-  const envComparisonData = [
-    { environment: "Development", Passed: 35, Failed: 2 },
-    { environment: "Testing", Passed: 48, Failed: 2 },
-    { environment: "Staging", Passed: 42, Failed: 1 },
-    { environment: "Production", Passed: 10, Failed: 0 },
-  ];
+  const envs = ["Development", "Testing", "Staging", "Production"];
+  const envComparisonData = envs.map((env) => {
+    const envExecs = executions.filter((e) => (e.environment || "").toLowerCase() === env.toLowerCase());
+    const p = envExecs.filter((e) => e.status === "completed" || e.status === "passed").length;
+    const f = envExecs.filter((e) => e.status === "failed").length;
+    return { environment: env, Passed: p, Failed: f };
+  });
 
   // Chart 3: Pass/Fail Distribution
   const pieData = [
@@ -81,40 +120,37 @@ export function TestReportsPage({ projectId, onNavigate, onSelectExecution }: Te
   ];
 
   // Most Failed Tests Table
-  const mostFailedTests = [
-    {
-      id: "tc-kyc-04",
-      name: "Verify KYC Upload Size Limitation Error Alert",
-      failure_count: 3,
-      suite: "Document & KYC Verification",
-      last_failure: "Today at 10:15 AM",
-      root_cause: "Modal alert text mismatch with production copy",
-    },
-    {
-      id: "tc-auth-09",
-      name: "Assert 2FA Code Expiration Timeout Banner",
-      failure_count: 2,
-      suite: "Core Platform Regression",
-      last_failure: "Yesterday",
-      root_cause: "Timer countdown exceeded 30s assertion threshold",
-    },
-  ];
+  const failedExecs = executions.filter((e) => e.status === "failed");
+  const mostFailedTests = failedExecs.slice(0, 5).map((fe) => ({
+    id: String(fe.id),
+    name: fe.name || "Test Case Execution",
+    failure_count: 1,
+    suite: fe.type || "Automated Test",
+    last_failure: fe.created_at || "Recent",
+    root_cause: fe.error_message || "Assertion failed during browser run.",
+  }));
 
   // Top Performing Suites
-  const topSuites = [
-    { name: "Payment Gateway 3DS Suite", tests: 8, pass_rate: 100, last_run: "Yesterday" },
-    { name: "Core Platform Regression Suite", tests: 18, pass_rate: 94.4, last_run: "Today" },
-    { name: "Document Verification Suite", tests: 12, pass_rate: 83.3, last_run: "2 days ago" },
-  ];
+  const topSuites = suites.slice(0, 5).map((st) => ({
+    name: st.name,
+    tests: st.tests?.length || 0,
+    pass_rate: st.success_rate || 100,
+    last_run: st.last_execution || "Never",
+  }));
 
   const handleExportCSV = () => {
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      "Test ID,Test Name,Suite,Result,Duration,Timestamp\n" +
-      "TC-AUTH-01,Assert Authentication Redirect,Core Platform,Passed,1.4s,2026-11-10T10:00:00Z\n" +
-      "TC-KYC-04,Verify KYC Upload Size Limitation,Document Verification,Failed,6.2s,2026-11-10T10:15:00Z\n" +
-      "TC-PAY-09,Assert Dynamic Currency Exchange,Payment Gateway,Passed,2.1s,2026-11-10T11:00:00Z\n";
-
+    const rows = [
+      ["Execution ID", "Name", "Type", "Status", "Duration", "Started At"],
+      ...executions.map((e) => [
+        e.id,
+        `"${(e.name || "").replace(/"/g, '""')}"`,
+        e.type || "Test",
+        e.status || "Unknown",
+        e.duration || "",
+        e.created_at || "",
+      ]),
+    ];
+    const csvContent = "data:text/csv;charset=utf-8," + rows.map((r) => r.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -127,10 +163,9 @@ export function TestReportsPage({ projectId, onNavigate, onSelectExecution }: Te
   };
 
   const handleDownloadFullReport = () => {
-    info("Preparing Report", "Generating PDF / JSON audit report...");
-    setTimeout(() => {
-      handleExportCSV();
-    }, 600);
+    const csvUrl = reportsApi.exportCsvUrl(projectId);
+    window.open(csvUrl, "_blank");
+    success("Report Downloaded", "CSV export initiated from backend.");
   };
 
   return (

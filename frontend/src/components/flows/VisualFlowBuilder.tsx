@@ -45,6 +45,16 @@ import {
   ListOrdered,
   Eye,
   Crosshair,
+  ArrowLeft,
+  RotateCw,
+  Calculator,
+  Calendar,
+  Code,
+  Braces,
+  Split,
+  CheckSquare,
+  ArrowDown,
+  Search,
 } from "lucide-react";
 import { flowsApi } from "../../api";
 import { useToast } from "../common/ToastProvider";
@@ -57,14 +67,30 @@ const ActionNode = ({ data, selected }: NodeProps) => {
       case "navigate": return <Globe className="w-4 h-4 text-blue-500" />;
       case "click": return <MousePointer className="w-4 h-4 text-indigo-500" />;
       case "double_click": return <MousePointer className="w-4 h-4 text-purple-500" />;
+      case "right_click": return <MousePointer className="w-4 h-4 text-pink-500" />;
+      case "hover": return <Eye className="w-4 h-4 text-sky-500" />;
       case "fill": return <Edit3 className="w-4 h-4 text-amber-500" />;
       case "type": return <Edit3 className="w-4 h-4 text-orange-500" />;
       case "select": return <ListOrdered className="w-4 h-4 text-teal-500" />;
+      case "check": return <CheckSquare className="w-4 h-4 text-emerald-500" />;
+      case "uncheck": return <CheckSquare className="w-4 h-4 text-slate-400" />;
+      case "scroll": return <ArrowDown className="w-4 h-4 text-blue-500" />;
       case "extract_text": return <FileText className="w-4 h-4 text-emerald-500" />;
       case "extract_attribute": return <FileText className="w-4 h-4 text-cyan-500" />;
       case "extract_table": return <Table className="w-4 h-4 text-blue-600" />;
       case "wait": return <Clock className="w-4 h-4 text-slate-500" />;
+      case "wait_until": return <Clock className="w-4 h-4 text-amber-500" />;
+      case "browser_back": return <ArrowLeft className="w-4 h-4 text-indigo-500" />;
+      case "browser_forward": return <ArrowRight className="w-4 h-4 text-indigo-500" />;
+      case "refresh": return <RotateCw className="w-4 h-4 text-teal-500" />;
+      case "switch": return <Split className="w-4 h-4 text-amber-500" />;
       case "loop": return <Repeat className="w-4 h-4 text-violet-500" />;
+      case "set_variable": return <Code className="w-4 h-4 text-blue-500" />;
+      case "string_operation": return <Code className="w-4 h-4 text-emerald-500" />;
+      case "number_operation": return <Calculator className="w-4 h-4 text-amber-500" />;
+      case "json_operation": return <Braces className="w-4 h-4 text-purple-500" />;
+      case "date_operation": return <Calendar className="w-4 h-4 text-rose-500" />;
+      case "array_operation": return <ListOrdered className="w-4 h-4 text-cyan-500" />;
       case "screenshot": return <Camera className="w-4 h-4 text-purple-500" />;
       case "approval": return <ShieldCheck className="w-4 h-4 text-amber-600" />;
       default: return <Play className="w-4 h-4 text-blue-500" />;
@@ -163,23 +189,49 @@ const StopNode = ({ selected }: NodeProps) => (
   </div>
 );
 
-// Catalog of 15 Actions
+// Categorized Catalog of Browser, Logic, Data, and Control Actions
 const ACTION_CATALOG = [
-  { action: "navigate", label: "Navigate URL", icon: Globe, category: "Navigation" },
-  { action: "click", label: "Click", icon: MousePointer, category: "Interaction" },
-  { action: "double_click", label: "Double Click", icon: MousePointer, category: "Interaction" },
-  { action: "fill", label: "Fill Input", icon: Edit3, category: "Interaction" },
-  { action: "type", label: "Type Text", icon: Edit3, category: "Interaction" },
-  { action: "select", label: "Select Option", icon: ListOrdered, category: "Interaction" },
-  { action: "extract_text", label: "Extract Text", icon: FileText, category: "Extraction" },
-  { action: "extract_attribute", label: "Extract Attribute", icon: FileText, category: "Extraction" },
-  { action: "extract_table", label: "Extract Table", icon: Table, category: "Extraction" },
-  { action: "wait", label: "Wait Delay", icon: Clock, category: "Flow Control" },
-  { action: "condition", label: "Condition (If/Else)", icon: GitBranch, category: "Flow Control" },
-  { action: "loop", label: "Loop Elements", icon: Repeat, category: "Flow Control" },
-  { action: "screenshot", label: "Screenshot", icon: Camera, category: "Verification" },
-  { action: "approval", label: "Human Approval", icon: ShieldCheck, category: "Governance" },
-  { action: "stop", label: "Stop Flow", icon: XCircle, category: "Flow Control" },
+  // Browser Actions
+  { action: "navigate", label: "Navigate URL", icon: Globe, category: "Browser" },
+  { action: "click", label: "Click", icon: MousePointer, category: "Browser" },
+  { action: "double_click", label: "Double Click", icon: MousePointer, category: "Browser" },
+  { action: "right_click", label: "Right Click", icon: MousePointer, category: "Browser" },
+  { action: "hover", label: "Hover Element", icon: Eye, category: "Browser" },
+  { action: "fill", label: "Fill Input", icon: Edit3, category: "Browser" },
+  { action: "type", label: "Type Text", icon: Edit3, category: "Browser" },
+  { action: "select", label: "Select Option", icon: ListOrdered, category: "Browser" },
+  { action: "check", label: "Check Checkbox", icon: CheckSquare, category: "Browser" },
+  { action: "uncheck", label: "Uncheck Checkbox", icon: CheckSquare, category: "Browser" },
+  { action: "scroll", label: "Scroll Page", icon: ArrowDown, category: "Browser" },
+  { action: "wait", label: "Wait Delay", icon: Clock, category: "Browser" },
+  { action: "wait_until", label: "Wait Until State", icon: Clock, category: "Browser" },
+  { action: "screenshot", label: "Screenshot", icon: Camera, category: "Browser" },
+  { action: "browser_back", label: "Browser Back", icon: ArrowLeft, category: "Browser" },
+  { action: "browser_forward", label: "Browser Forward", icon: ArrowRight, category: "Browser" },
+  { action: "refresh", label: "Refresh Page", icon: RotateCw, category: "Browser" },
+  { action: "extract_text", label: "Extract Text", icon: FileText, category: "Browser" },
+  { action: "extract_attribute", label: "Extract Attribute", icon: FileText, category: "Browser" },
+  { action: "extract_table", label: "Extract Table", icon: Table, category: "Browser" },
+
+  // Logic & Branching Actions
+  { action: "condition", label: "Condition (If/Else)", icon: GitBranch, category: "Logic" },
+  { action: "switch", label: "Switch Case", icon: Split, category: "Logic" },
+  { action: "loop", label: "For Loop", icon: Repeat, category: "Logic" },
+  { action: "while_loop", label: "While Loop", icon: Repeat, category: "Logic" },
+  { action: "break", label: "Break Loop", icon: XCircle, category: "Logic" },
+  { action: "continue", label: "Continue Loop", icon: ArrowRight, category: "Logic" },
+
+  // Data Operations
+  { action: "set_variable", label: "Set Variable", icon: Code, category: "Data" },
+  { action: "string_operation", label: "String Operations", icon: FileText, category: "Data" },
+  { action: "number_operation", label: "Number Operations", icon: Calculator, category: "Data" },
+  { action: "json_operation", label: "JSON Operations", icon: Braces, category: "Data" },
+  { action: "date_operation", label: "Date Operations", icon: Calendar, category: "Data" },
+  { action: "array_operation", label: "Array Operations", icon: ListOrdered, category: "Data" },
+
+  // Control Actions
+  { action: "approval_gate", label: "Human Approval", icon: ShieldCheck, category: "Control" },
+  { action: "stop", label: "Stop Flow", icon: XCircle, category: "Control" },
 ];
 
 interface VisualFlowBuilderProps {
@@ -195,7 +247,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
   flowId,
   projectId,
   initialDefinition,
-  flowName = "Enterprise Customer Onboarding Flow",
+  flowName = "New Automation Flow",
   onSaveSuccess,
   onNavigateHistory,
 }) => {
@@ -208,61 +260,8 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
     []
   );
 
-  const defaultNodes: Node[] = initialDefinition?.nodes || [
-    {
-      id: "node_1",
-      type: "action",
-      position: { x: 250, y: 40 },
-      data: {
-        action: "navigate",
-        config: { url: "https://example.com/login", timeout: 30 },
-        summary: "https://example.com/login",
-      },
-    },
-    {
-      id: "node_2",
-      type: "action",
-      position: { x: 250, y: 150 },
-      data: {
-        action: "fill",
-        config: { logical_id: "email_input", value_template: "admin@company.internal" },
-        summary: "Fill email_input",
-      },
-    },
-    {
-      id: "node_3",
-      type: "action",
-      position: { x: 250, y: 260 },
-      data: {
-        action: "click",
-        config: { logical_id: "login_submit_btn", recognition_strategy: "deterministic_multi_factor", timeout: 15 },
-        summary: "Click login_submit_btn",
-      },
-    },
-    {
-      id: "node_4",
-      type: "action",
-      position: { x: 250, y: 370 },
-      data: {
-        action: "screenshot",
-        config: { filename: "dashboard_post_login.png", full_page: true },
-        summary: "Take full screenshot",
-      },
-    },
-    {
-      id: "node_5",
-      type: "stop",
-      position: { x: 280, y: 480 },
-      data: { action: "stop", config: {} },
-    },
-  ];
-
-  const defaultEdges: Edge[] = initialDefinition?.edges || [
-    { id: "e1-2", source: "node_1", target: "node_2", animated: true },
-    { id: "e2-3", source: "node_2", target: "node_3", animated: true },
-    { id: "e3-4", source: "node_3", target: "node_4", animated: true },
-    { id: "e4-5", source: "node_4", target: "node_5" },
-  ];
+  const defaultNodes: Node[] = initialDefinition?.nodes || [];
+  const defaultEdges: Edge[] = initialDefinition?.edges || [];
 
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
@@ -272,6 +271,8 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
   const [executing, setExecuting] = useState(false);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<any[]>([]);
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState<string>("All");
 
   const { success, error, warning, info } = useToast();
   const { confirm } = useConfirm();
@@ -280,26 +281,63 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
+  const filteredCatalog = useMemo(() => {
+    return ACTION_CATALOG.filter((item) => {
+      const matchCat = catalogCategory === "All" || item.category === catalogCategory;
+      const matchSearch =
+        catalogSearch.trim() === "" ||
+        item.label.toLowerCase().includes(catalogSearch.toLowerCase()) ||
+        item.action.toLowerCase().includes(catalogSearch.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [catalogCategory, catalogSearch]);
+
   // Add node from left action catalog
   const addNodeFromCatalog = (action: string) => {
     const newId = `node_${Date.now()}`;
     const type = action === "condition" ? "condition" : action === "stop" ? "stop" : "action";
 
     const defaultConfigs: Record<string, any> = {
-      navigate: { url: "https://example.com", timeout: 30 },
+      // Browser
+      navigate: { url: "https://example.com", timeout: 30, wait_until: "load" },
       click: { logical_id: "button_element", recognition_strategy: "deterministic_multi_factor", timeout: 15 },
       double_click: { logical_id: "grid_row", timeout: 10 },
-      fill: { logical_id: "input_element", value_template: "Sample Input" },
+      right_click: { logical_id: "context_menu_target" },
+      hover: { logical_id: "nav_dropdown" },
+      fill: { logical_id: "input_element", value_template: "Sample Input", is_secret: false },
       type: { logical_id: "input_element", text: "Hello World", delay_ms: 50 },
       select: { logical_id: "dropdown_element", option_value: "1" },
+      check: { logical_id: "terms_checkbox" },
+      uncheck: { logical_id: "newsletter_checkbox" },
+      scroll: { direction: "down", amount: 400 },
+      wait: { duration_ms: 2000, condition: "none" },
+      wait_until: { selector: "#target-element", condition: "visible", timeout_ms: 10000 },
+      screenshot: { filename: "step_capture.png", full_page: false },
+      browser_back: {},
+      browser_forward: {},
+      refresh: {},
       extract_text: { logical_id: "heading_element", target_variable: "extracted_header" },
       extract_attribute: { logical_id: "link_element", attribute_name: "href", target_variable: "extracted_link" },
       extract_table: { logical_id: "data_table", target_variable: "table_rows" },
-      wait: { duration_ms: 2000, condition: "none" },
+
+      // Logic
       condition: { variable: "status_code", operator: "==", expected_value: "200" },
+      switch: { expression: "{{status}}", cases: ["active", "pending", "default"] },
       loop: { collection_variable: "items", iterator_variable: "item", max_iterations: 10 },
-      screenshot: { filename: "step_capture.png", full_page: false },
-      approval: { approver_role: "Admin", prompt: "Approve critical order mutation", timeout_hours: 24 },
+      while_loop: { condition_variable: "has_more", max_iterations: 20 },
+      break: {},
+      continue: {},
+
+      // Data
+      set_variable: { variable_name: "custom_var", value_template: "value" },
+      string_operation: { operation: "upper", input: "Sample Text", output_variable: "str_result" },
+      number_operation: { operation: "add", a: 10, b: 5, output_variable: "num_result" },
+      json_operation: { operation: "parse", input: '{"status": "ok"}', output_variable: "json_result" },
+      date_operation: { operation: "now", output_variable: "date_result", format: "%Y-%m-%d" },
+      array_operation: { operation: "length", array: [], output_variable: "arr_result" },
+
+      // Control
+      approval_gate: { approver_role: "Admin", prompt: "Approve critical order mutation", timeout_hours: 24 },
       stop: { reason: "Flow completed successfully", status_code: 0 },
     };
 
@@ -526,15 +564,44 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
       {/* 2. 3-PANEL WORKSPACE (Left Catalog, Center Canvas, Right Configuration) */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* LEFT PANEL: 15-Action Catalog */}
-        <div className="w-60 bg-white dark:bg-[#161F30] border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
-          <div className="p-3 border-b border-slate-100 dark:border-slate-800 font-bold text-xs text-slate-700 dark:text-slate-300 flex items-center justify-between">
-            <span>Action Catalog</span>
-            <span className="text-[10px] text-slate-400 font-mono">15 Actions</span>
+        {/* LEFT PANEL: Action Catalog */}
+        <div className="w-64 bg-white dark:bg-[#161F30] border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
+          <div className="p-3 border-b border-slate-100 dark:border-slate-800 space-y-2">
+            <div className="flex items-center justify-between font-bold text-xs text-slate-700 dark:text-slate-300">
+              <span>Action Catalog</span>
+              <span className="text-[10px] text-slate-400 font-mono">{filteredCatalog.length} Actions</span>
+            </div>
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" />
+              <input
+                type="text"
+                placeholder="Search actions..."
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                className="w-full pl-7 pr-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[10px] font-semibold">
+              {["All", "Browser", "Logic", "Data", "Control"].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCatalogCategory(cat)}
+                  className={`px-2 py-0.5 rounded-md transition shrink-0 ${
+                    catalogCategory === cat
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
-            {ACTION_CATALOG.map((item) => {
+            {filteredCatalog.map((item) => {
               const Icon = item.icon;
               return (
                 <button
@@ -543,12 +610,15 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
                   className="w-full flex items-center justify-between p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 text-left transition group"
                 >
                   <div className="flex items-center gap-2">
-                    <Icon className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400 group-hover:scale-110 transition" />
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      {item.label}
-                    </span>
+                    <Icon className="w-3.5 h-3.5 text-[#2563EB] dark:text-blue-400 group-hover:scale-110 transition shrink-0" />
+                    <div>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block leading-tight">
+                        {item.label}
+                      </span>
+                      <span className="text-[9px] text-slate-400 block">{item.category}</span>
+                    </div>
                   </div>
-                  <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition" />
+                  <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition shrink-0" />
                 </button>
               );
             })}
@@ -635,7 +705,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
                   </div>
                 )}
 
-                {(selectedNode.data?.action === "click" || selectedNode.data?.action === "double_click") && (
+                {(["click", "double_click", "right_click", "hover", "check", "uncheck"].includes(String(selectedNode.data?.action))) && (
                   <div className="space-y-3">
                     <div>
                       <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Element Logical ID *</label>
@@ -659,6 +729,417 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
                         <option value="stable_attribute">Stable ID / Data-Testid</option>
                         <option value="structural_xpath">Structural Fingerprint</option>
                       </select>
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "select" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Element Logical ID *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.logical_id || ""}
+                        onChange={(e) => updateConfig("logical_id", e.target.value)}
+                        placeholder="e.g. country_select"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Option Value *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.option_value || ""}
+                        onChange={(e) => updateConfig("option_value", e.target.value)}
+                        placeholder="e.g. US"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(["extract_text", "extract_attribute", "extract_table"].includes(String(selectedNode.data?.action))) && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Element Logical ID *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.logical_id || ""}
+                        onChange={(e) => updateConfig("logical_id", e.target.value)}
+                        placeholder="e.g. order_total_span"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    {selectedNode.data?.action === "extract_attribute" && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Attribute Name</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.attribute_name || "href"}
+                          onChange={(e) => updateConfig("attribute_name", e.target.value)}
+                          placeholder="e.g. href, data-id, value"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Variable Name *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.target_variable || "extracted_data"}
+                        onChange={(e) => updateConfig("target_variable", e.target.value)}
+                        placeholder="e.g. extracted_data"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "scroll" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Scroll Direction</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.direction || "down"}
+                        onChange={(e) => updateConfig("direction", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="down">Down</option>
+                        <option value="up">Up</option>
+                        <option value="top">To Top of Page</option>
+                        <option value="bottom">To Bottom of Page</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Scroll Amount (pixels)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.amount || 400}
+                        onChange={(e) => updateConfig("amount", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "wait_until" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Selector *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.selector || ""}
+                        onChange={(e) => updateConfig("selector", e.target.value)}
+                        placeholder="#modal-ready, .checkout-btn"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Condition</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.condition || "visible"}
+                        onChange={(e) => updateConfig("condition", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="visible">Element Visible</option>
+                        <option value="hidden">Element Hidden</option>
+                        <option value="enabled">Element Enabled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.timeout_ms || 10000}
+                        onChange={(e) => updateConfig("timeout_ms", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "switch" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Expression / Variable *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.expression || ""}
+                        onChange={(e) => updateConfig("expression", e.target.value)}
+                        placeholder="{{status}} or env.ENV_NAME"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Cases (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={((selectedNode.data?.config as any)?.cases || []).join(", ")}
+                        onChange={(e) =>
+                          updateConfig(
+                            "cases",
+                            e.target.value.split(",").map((s) => s.trim()).filter(Boolean)
+                          )
+                        }
+                        placeholder="active, pending, error"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "set_variable" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Variable Name *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.variable_name || ""}
+                        onChange={(e) => updateConfig("variable_name", e.target.value)}
+                        placeholder="e.g. auth_token"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Value / Template</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.value_template || ""}
+                        onChange={(e) => updateConfig("value_template", e.target.value)}
+                        placeholder="e.g. https://api.corp.internal"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "string_operation" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operation</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.operation || "upper"}
+                        onChange={(e) => updateConfig("operation", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="upper">UPPERCASE</option>
+                        <option value="lower">lowercase</option>
+                        <option value="trim">Trim Whitespace</option>
+                        <option value="replace">Find & Replace</option>
+                        <option value="split">Split by Delimiter</option>
+                        <option value="length">Length</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Input Text / Variable</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.input || ""}
+                        onChange={(e) => updateConfig("input", e.target.value)}
+                        placeholder="{{extracted_text}}"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    {(selectedNode.data?.config as any)?.operation === "replace" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Find"
+                          value={(selectedNode.data?.config as any)?.find || ""}
+                          onChange={(e) => updateConfig("find", e.target.value)}
+                          className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Replace With"
+                          value={(selectedNode.data?.config as any)?.replace || ""}
+                          onChange={(e) => updateConfig("replace", e.target.value)}
+                          className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Output Variable *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.output_variable || "str_result"}
+                        onChange={(e) => updateConfig("output_variable", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "number_operation" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operation</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.operation || "add"}
+                        onChange={(e) => updateConfig("operation", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="add">Add (a + b)</option>
+                        <option value="subtract">Subtract (a - b)</option>
+                        <option value="multiply">Multiply (a * b)</option>
+                        <option value="divide">Divide (a / b)</option>
+                        <option value="round">Round</option>
+                        <option value="abs">Absolute Value</option>
+                        <option value="min">Minimum (min(a,b))</option>
+                        <option value="max">Maximum (max(a,b))</option>
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operand A</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.a ?? 0}
+                          onChange={(e) => updateConfig("a", e.target.value)}
+                          className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operand B</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.b ?? 0}
+                          onChange={(e) => updateConfig("b", e.target.value)}
+                          className="w-full px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Output Variable *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.output_variable || "num_result"}
+                        onChange={(e) => updateConfig("output_variable", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "json_operation" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operation</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.operation || "parse"}
+                        onChange={(e) => updateConfig("operation", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="parse">Parse JSON String</option>
+                        <option value="stringify">Stringify Object</option>
+                        <option value="get_key">Get Key Value</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Input Data / Variable</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.input || ""}
+                        onChange={(e) => updateConfig("input", e.target.value)}
+                        placeholder="{{json_payload}}"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    {(selectedNode.data?.config as any)?.operation === "get_key" && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Key Name</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.key || ""}
+                          onChange={(e) => updateConfig("key", e.target.value)}
+                          placeholder="data.items.0.id"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Output Variable *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.output_variable || "json_result"}
+                        onChange={(e) => updateConfig("output_variable", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "date_operation" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Operation</label>
+                      <select
+                        value={(selectedNode.data?.config as any)?.operation || "now"}
+                        onChange={(e) => updateConfig("operation", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      >
+                        <option value="now">Current ISO Date (UTC)</option>
+                        <option value="timestamp">Unix Timestamp</option>
+                        <option value="format">Formatted Date</option>
+                        <option value="add_days">Add Days</option>
+                      </select>
+                    </div>
+                    {(selectedNode.data?.config as any)?.operation === "format" && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Format Pattern</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.format || "%Y-%m-%d"}
+                          onChange={(e) => updateConfig("format", e.target.value)}
+                          placeholder="%Y-%m-%d %H:%M:%S"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                        />
+                      </div>
+                    )}
+                    {(selectedNode.data?.config as any)?.operation === "add_days" && (
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Days to Add</label>
+                        <input
+                          type="number"
+                          value={(selectedNode.data?.config as any)?.days || 1}
+                          onChange={(e) => updateConfig("days", Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Output Variable *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.output_variable || "date_result"}
+                        onChange={(e) => updateConfig("output_variable", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "approval_gate" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Approver Role</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.approver_role || "Admin"}
+                        onChange={(e) => updateConfig("approver_role", e.target.value)}
+                        placeholder="Admin or Lead QA"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Prompt / Reason</label>
+                      <textarea
+                        value={(selectedNode.data?.config as any)?.prompt || ""}
+                        onChange={(e) => updateConfig("prompt", e.target.value)}
+                        rows={2}
+                        placeholder="Please verify before continuing..."
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs"
+                      />
                     </div>
                   </div>
                 )}
@@ -756,6 +1237,20 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
                         type="text"
                         value={(selectedNode.data?.config as any)?.expected_value || "true"}
                         onChange={(e) => updateConfig("expected_value", e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "stop" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Stop Reason</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.reason || "Flow completed successfully"}
+                        onChange={(e) => updateConfig("reason", e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                       />
                     </div>

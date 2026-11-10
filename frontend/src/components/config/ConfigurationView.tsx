@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Layers,
   Globe,
@@ -16,6 +16,7 @@ import {
   Lock,
 } from "lucide-react";
 import { NavView } from "@/components/layout/AppShell";
+import { projectsApi, environmentsApi, credentialsApi } from "@/api";
 
 interface ConfigurationViewProps {
   initialSubTab?: "projects" | "environments" | "credentials" | "browser";
@@ -27,62 +28,71 @@ export function ConfigurationView({ initialSubTab = "projects" }: ConfigurationV
   );
 
   // Projects State
-  const [projects, setProjects] = useState([
-    {
-      id: "p1-company-portal",
-      name: "Acme Customer Portal",
-      description: "Primary customer facing loan & referral automation workflows",
-      active: true,
-      created_at: "2026-11-01",
-    },
-    {
-      id: "p2-internal-ops",
-      name: "Internal Ops & Backoffice",
-      description: "Automated underwriting, verification & approval pipelines",
-      active: false,
-      created_at: "2026-11-05",
-    },
-  ]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
 
   // Environments State
-  const [environments, setEnvironments] = useState([
-    {
-      id: "env-staging",
-      name: "Staging",
-      baseUrl: "https://staging.internal.company.net",
-      isDefault: true,
-      allowedDomains: ["staging.internal.company.net", "auth.internal.company.net"],
-    },
-    {
-      id: "env-prod",
-      name: "Production",
-      baseUrl: "https://app.company.net",
-      isDefault: false,
-      allowedDomains: ["app.company.net"],
-    },
-  ]);
+  const [environments, setEnvironments] = useState<any[]>([]);
 
   // Credentials State
-  const [credentials, setCredentials] = useState([
-    {
-      id: "cred-admin-user",
-      keyName: "APP_ADMIN_CREDENTIALS",
-      username: "ops.admin@company.net",
-      maskedSecret: "••••••••••••••••",
-      env: "Staging",
-      lastRotated: "2026-11-08",
-    },
-    {
-      id: "cred-test-partner",
-      keyName: "TEST_PARTNER_API_KEY",
-      username: "partner_sandbox_491",
-      maskedSecret: "••••••••••••••••",
-      env: "Staging",
-      lastRotated: "2026-11-09",
-    },
-  ]);
+  const [credentials, setCredentials] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadConfigData();
+  }, [activeTab]);
+
+  const loadConfigData = async () => {
+    setLoading(true);
+    try {
+      const [pRes, eRes, cRes] = await Promise.allSettled([
+        projectsApi.list(),
+        environmentsApi.list(),
+        credentialsApi.list(),
+      ]);
+
+      if (pRes.status === "fulfilled" && pRes.value) {
+        setProjects(
+          pRes.value.map((p: any) => ({
+            id: String(p.id),
+            name: p.name,
+            description: p.description || "Workspace Project",
+            active: true,
+            created_at: p.created_at ? p.created_at.split("T")[0] : "Recent",
+          }))
+        );
+      }
+      if (eRes.status === "fulfilled" && eRes.value) {
+        setEnvironments(
+          eRes.value.map((e: any) => ({
+            id: String(e.id),
+            name: e.name,
+            baseUrl: e.base_url,
+            isDefault: false,
+            allowedDomains: e.allowed_domains || [],
+          }))
+        );
+      }
+      if (cRes.status === "fulfilled" && cRes.value) {
+        setCredentials(
+          cRes.value.map((c: any) => ({
+            id: String(c.id),
+            keyName: c.name,
+            username: c.username || "",
+            maskedSecret: "••••••••••••••••",
+            env: "Active",
+            lastRotated: "Recent",
+          }))
+        );
+      }
+    } catch {
+      // offline
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Browser Settings State
   const [browserConfig, setBrowserConfig] = useState({
@@ -282,7 +292,7 @@ export function ConfigurationView({ initialSubTab = "projects" }: ConfigurationV
                   <div className="text-[11px] text-slate-500 space-y-1">
                     <span className="font-medium text-slate-600">Allowed Domains:</span>
                     <div className="flex flex-wrap gap-1">
-                      {env.allowedDomains.map((dom) => (
+                      {env.allowedDomains.map((dom: string) => (
                         <span key={dom} className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-700 font-mono text-[10px]">
                           {dom}
                         </span>

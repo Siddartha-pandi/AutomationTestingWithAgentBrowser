@@ -8,11 +8,14 @@ import { AllFlowsPage } from "@/components/flows/AllFlowsPage";
 import { VisualFlowBuilder } from "@/components/flows/VisualFlowBuilder";
 import { CreateFlowPage } from "@/components/flows/CreateFlowPage";
 import { SchedulesPage } from "@/components/flows/SchedulesPage";
+import { FlowTemplatesPage } from "@/components/flows/FlowTemplatesPage";
 import { TestCasesPage } from "@/components/testing/TestCasesPage";
 import { TestSuitesPage } from "@/components/testing/TestSuitesPage";
 import { VisualTestBuilder } from "@/components/testing/VisualTestBuilder";
 import { TestReportsPage } from "@/components/testing/TestReportsPage";
+import { TestDataPage } from "@/components/testing/TestDataPage";
 import { LiveBrowserPage } from "@/components/browser/LiveBrowserPage";
+import { BrowserRecorderPage } from "@/components/browser/BrowserRecorderPage";
 import { DOMExplorerPage } from "@/components/browser/DOMExplorerPage";
 import { ElementProfilesPage } from "@/components/browser/ElementProfilesPage";
 import { ElementRecognitionPage } from "@/components/browser/ElementRecognitionPage";
@@ -88,6 +91,15 @@ export function AuthenticatedWorkspace() {
         />
       );
 
+    case "automation_templates":
+      return (
+        <FlowTemplatesPage
+          projectId={currentProject.id}
+          onNavigate={setCurrentView}
+          onSelectFlow={setSelectedFlowId}
+        />
+      );
+
     case "automation_schedules":
       return (
         <SchedulesPage
@@ -136,11 +148,29 @@ export function AuthenticatedWorkspace() {
         />
       );
 
+    case "testing_data":
+      return (
+        <TestDataPage
+          projectId={currentProject.id}
+          onNavigate={setCurrentView}
+        />
+      );
+
     case "browser_live":
       return (
         <LiveBrowserPage
           projectId={currentProject.id}
           onNavigate={setCurrentView}
+        />
+      );
+
+    case "browser_recorder":
+      return (
+        <BrowserRecorderPage
+          projectId={currentProject.id}
+          onNavigate={setCurrentView}
+          onSelectFlow={setSelectedFlowId}
+          onSelectTest={setSelectedTestId}
         />
       );
 

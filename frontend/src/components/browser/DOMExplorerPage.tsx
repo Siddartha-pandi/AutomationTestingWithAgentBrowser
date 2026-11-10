@@ -42,15 +42,14 @@ interface DOMNode {
 }
 
 export function DOMExplorerPage({ projectId, onNavigate }: DOMExplorerPageProps) {
-  const [url, setUrl] = useState("https://staging.internal.company.net/auth");
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("btn_submit");
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("app-root");
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
     html: true,
     body: true,
-    main: true,
-    form_login: true,
+    "app-root": true,
   });
 
   const { success, info } = useToast();

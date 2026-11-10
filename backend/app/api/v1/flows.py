@@ -17,7 +17,7 @@ from backend.app.engine.flows.flow_executor import FlowExecutor
 from backend.app.engine.flows.flow_schema import FlowGraphDefinition
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.execution import Execution
-from backend.app.models.project import Project
+from backend.app.models.project import Project, ProjectMember
 from backend.app.api.v1.projects import resolve_project_id
 from backend.app.schemas.flows import (
     ExecuteFlowRequest,
@@ -110,6 +110,118 @@ def create_flow(
     )
 
 
+# 4 Pre-built Enterprise Flow Templates
+FLOW_TEMPLATES = [
+    {
+        "id": "tpl-login-session",
+        "name": "Enterprise Login & Session Verification",
+        "category": "Authentication",
+        "description": "Standard SSO/Credential navigation, input filling, submit click, and post-login DOM validation.",
+        "steps_count": 5,
+        "definition": {
+            "name": "Enterprise Login & Session Verification",
+            "start_node_id": "step_1",
+            "nodes": [
+                {"id": "step_1", "type": "action", "action": "navigate", "config": {"url": "https://example.com/login", "timeout": 30}, "position": {"x": 250, "y": 80}},
+                {"id": "step_2", "type": "action", "action": "fill", "config": {"logical_id": "email_input", "value_template": "{{env.user_email}}"}, "position": {"x": 250, "y": 180}},
+                {"id": "step_3", "type": "action", "action": "fill", "config": {"logical_id": "password_input", "value_template": "{{env.user_password}}", "is_secret": True}, "position": {"x": 250, "y": 280}},
+                {"id": "step_4", "type": "action", "action": "click", "config": {"logical_id": "submit_button", "recognition_strategy": "deterministic_multi_factor"}, "position": {"x": 250, "y": 380}},
+                {"id": "step_5", "type": "action", "action": "screenshot", "config": {"filename": "dashboard_login.png"}, "position": {"x": 250, "y": 480}},
+            ],
+            "edges": [
+                {"id": "e1-2", "source": "step_1", "target": "step_2"},
+                {"id": "e2-3", "source": "step_2", "target": "step_3"},
+                {"id": "e3-4", "source": "step_3", "target": "step_4"},
+                {"id": "e4-5", "source": "step_4", "target": "step_5"},
+            ],
+        },
+    },
+    {
+        "id": "tpl-multistep-form",
+        "name": "Multi-Step Form Wizard & Lead Creation",
+        "category": "Business Process",
+        "description": "Step-by-step navigation, profile and personal details data entry, dropdown select, and submission.",
+        "steps_count": 6,
+        "definition": {
+            "name": "Multi-Step Form Wizard & Lead Creation",
+            "start_node_id": "step_1",
+            "nodes": [
+                {"id": "step_1", "type": "action", "action": "navigate", "config": {"url": "https://example.com/onboarding", "timeout": 30}, "position": {"x": 250, "y": 80}},
+                {"id": "step_2", "type": "action", "action": "fill", "config": {"logical_id": "lead_name_input", "value_template": "John Doe"}, "position": {"x": 250, "y": 180}},
+                {"id": "step_3", "type": "action", "action": "select", "config": {"logical_id": "industry_select", "option_value": "Healthcare"}, "position": {"x": 250, "y": 280}},
+                {"id": "step_4", "type": "action", "action": "check", "config": {"logical_id": "agree_terms_checkbox"}, "position": {"x": 250, "y": 380}},
+                {"id": "step_5", "type": "action", "action": "click", "config": {"logical_id": "next_step_button"}, "position": {"x": 250, "y": 480}},
+                {"id": "step_6", "type": "action", "action": "wait", "config": {"duration_ms": 2000}, "position": {"x": 250, "y": 580}},
+            ],
+            "edges": [
+                {"id": "e1-2", "source": "step_1", "target": "step_2"},
+                {"id": "e2-3", "source": "step_2", "target": "step_3"},
+                {"id": "e3-4", "source": "step_3", "target": "step_4"},
+                {"id": "e4-5", "source": "step_4", "target": "step_5"},
+                {"id": "e5-6", "source": "step_5", "target": "step_6"},
+            ],
+        },
+    },
+    {
+        "id": "tpl-table-scraper",
+        "name": "Dynamic Table Scraper & Data Validator",
+        "category": "Data Extraction",
+        "description": "Extract dynamic data grids, loop rows, calculate numeric aggregates, and log structured output.",
+        "steps_count": 5,
+        "definition": {
+            "name": "Dynamic Table Scraper & Data Validator",
+            "start_node_id": "step_1",
+            "nodes": [
+                {"id": "step_1", "type": "action", "action": "navigate", "config": {"url": "https://example.com/reports", "timeout": 30}, "position": {"x": 250, "y": 80}},
+                {"id": "step_2", "type": "action", "action": "extract_table", "config": {"logical_id": "grid_table", "target_variable": "raw_table"}, "position": {"x": 250, "y": 180}},
+                {"id": "step_3", "type": "action", "action": "array_operation", "config": {"operation": "length", "output_variable": "row_count"}, "position": {"x": 250, "y": 280}},
+                {"id": "step_4", "type": "condition", "action": "condition", "config": {"variable": "row_count", "operator": ">", "expected_value": "0"}, "position": {"x": 250, "y": 380}},
+                {"id": "step_5", "type": "action", "action": "screenshot", "config": {"filename": "table_scraped.png"}, "position": {"x": 250, "y": 480}},
+            ],
+            "edges": [
+                {"id": "e1-2", "source": "step_1", "target": "step_2"},
+                {"id": "e2-3", "source": "step_2", "target": "step_3"},
+                {"id": "e3-4", "source": "step_3", "target": "step_4"},
+                {"id": "e4-5", "source": "step_4", "target": "step_5", "source_handle": "true"},
+            ],
+        },
+    },
+    {
+        "id": "tpl-fvr-audit",
+        "name": "FVR System Status & Health Audit",
+        "category": "Governance & Auditing",
+        "description": "Deterministic status audit verifying pending approvals, SLA alerts, and system health badges.",
+        "steps_count": 5,
+        "definition": {
+            "name": "FVR System Status & Health Audit",
+            "start_node_id": "step_1",
+            "nodes": [
+                {"id": "step_1", "type": "action", "action": "navigate", "config": {"url": "https://example.com/fvr-status", "timeout": 30}, "position": {"x": 250, "y": 80}},
+                {"id": "step_2", "type": "action", "action": "extract_text", "config": {"logical_id": "system_badge", "target_variable": "badge_status"}, "position": {"x": 250, "y": 180}},
+                {"id": "step_3", "type": "condition", "action": "condition", "config": {"variable": "badge_status", "operator": "==", "expected_value": "OPERATIONAL"}, "position": {"x": 250, "y": 280}},
+                {"id": "step_4", "type": "action", "action": "screenshot", "config": {"filename": "audit_passed.png"}, "position": {"x": 150, "y": 380}},
+                {"id": "step_5", "type": "action", "action": "stop", "config": {"reason": "Badge status mismatch"}, "position": {"x": 350, "y": 380}},
+            ],
+            "edges": [
+                {"id": "e1-2", "source": "step_1", "target": "step_2"},
+                {"id": "e2-3", "source": "step_2", "target": "step_3"},
+                {"id": "e3-4", "source": "step_3", "target": "step_4", "source_handle": "true"},
+                {"id": "e3-5", "source": "step_3", "target": "step_5", "source_handle": "false"},
+            ],
+        },
+    },
+]
+
+
+@router.get("/templates")
+def list_flow_templates(
+    current_user=Depends(require_permission("flows:read")),
+) -> list[dict[str, Any]]:
+    """Returns curated deterministic flow templates for rapid automation creation."""
+    return FLOW_TEMPLATES
+
+
+
 @router.get("", response_model=list[FlowResponse])
 def list_flows(
     project_id: str | None = None,
@@ -125,9 +237,21 @@ def list_flows(
         .options(joinedload(AutomationDefinition.versions))
     )
     if project_id:
-        proj = resolve_project_id(db, project_id)
+        proj = resolve_project_id(db, project_id, current_user.id)
         if proj:
             query = query.filter(AutomationDefinition.project_id == proj.id)
+        else:
+            return []
+    elif not getattr(current_user, "is_superuser", False):
+        user_projects = (
+            db.query(Project.id)
+            .filter(
+                (Project.owner_id == current_user.id)
+                | (Project.members.any(ProjectMember.user_id == current_user.id))
+            )
+            .subquery()
+        )
+        query = query.filter(AutomationDefinition.project_id.in_(user_projects))
 
     flows = query.order_by(AutomationDefinition.updated_at.desc()).offset(offset).limit(limit).all()
     results = []

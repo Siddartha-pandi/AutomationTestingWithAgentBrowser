@@ -134,6 +134,9 @@ class AgentBrowserAdapter:
             allowed = False
             for pattern in active_domains:
                 pattern = pattern.strip().lower()
+                if pattern in ("*", "*.*", "all"):
+                    allowed = True
+                    break
                 if pattern.startswith("*."):
                     base = pattern[2:]
                     if hostname == base or hostname.endswith(f".{base}"):
@@ -350,6 +353,104 @@ class AgentBrowserAdapter:
             success=res.is_success,
             action="select",
             target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def hover(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Hovers over the specified element."""
+        res = self.executor.execute(["hover", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="hover",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def right_click(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Performs a context menu / right click on the target element."""
+        res = self.executor.execute(["click", selector, "--button", "right"], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="right_click",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def check(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Checks a checkbox or radio button if not already checked."""
+        res = self.executor.execute(["check", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="check",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def uncheck(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Unchecks a checkbox if currently checked."""
+        res = self.executor.execute(["uncheck", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="uncheck",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def scroll(
+        self,
+        session_id: str,
+        direction: str = "down",
+        amount: int = 400,
+        selector: str | None = None,
+        timeout: float = 15.0,
+    ) -> ActionResult:
+        """Scrolls the page or element in the specified direction."""
+        args = ["scroll", direction, str(amount)]
+        if selector:
+            args.extend(["-s", selector])
+        res = self.executor.execute(args, session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="scroll",
+            target=selector or direction,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def back(self, session_id: str, timeout: float = 15.0) -> ActionResult:
+        """Navigates back in browser history."""
+        res = self.executor.execute(["back"], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="back",
+            target="history.back",
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def forward(self, session_id: str, timeout: float = 15.0) -> ActionResult:
+        """Navigates forward in browser history."""
+        res = self.executor.execute(["forward"], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="forward",
+            target="history.forward",
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def reload(self, session_id: str, timeout: float = 15.0) -> ActionResult:
+        """Reloads the current page."""
+        res = self.executor.execute(["reload"], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="reload",
+            target="page.reload",
             duration_ms=res.duration_ms,
             output=res.stdout.strip(),
         )

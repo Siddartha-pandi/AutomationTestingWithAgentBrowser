@@ -49,7 +49,7 @@ interface UserProfile {
 export default function Home() {
   const [currentView, setCurrentView] = useState<NavView>("dashboard_overview");
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string>("exec-run-101");
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string>("");
   const [selectedFlowId, setSelectedFlowId] = useState<string | undefined>(undefined);
   const [selectedTestId, setSelectedTestId] = useState<string | undefined>(undefined);
 
@@ -66,15 +66,19 @@ export default function Home() {
       } catch {}
     }
     return {
-      id: "p1-default",
-      name: "Enterprise QA Suite",
+      id: "",
+      name: "",
     };
   });
 
   const handleSelectProject = (proj: { id: string; name: string }) => {
     setCurrentProject(proj);
     try {
-      localStorage.setItem("active_project", JSON.stringify(proj));
+      if (proj && proj.id) {
+        localStorage.setItem("active_project", JSON.stringify(proj));
+      } else {
+        localStorage.removeItem("active_project");
+      }
     } catch {}
   };
 
@@ -100,18 +104,8 @@ export default function Home() {
           const first = projects[0];
           handleSelectProject({ id: first.id, name: first.name });
         } else {
-          // If no projects exist in the database, initialize default workspace
-          projectsApi
-            .create({
-              name: "Enterprise QA Suite",
-              description: "Default Organization Workspace",
-            })
-            .then((created) => {
-              if (created && created.id) {
-                handleSelectProject({ id: created.id, name: created.name });
-              }
-            })
-            .catch(() => {});
+          // No projects exist for this user - do not auto-create
+          handleSelectProject({ id: "", name: "" });
         }
       })
       .catch((err) => {

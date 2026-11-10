@@ -8,15 +8,19 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
-    STORAGE_DIR=/app/reports
+    STORAGE_DIR=/app/reports \
+    AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
-# 1. Install system utilities and Linux browser libraries
+# 1. Install system utilities, Chromium, and Linux browser libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     ca-certificates \
+    chromium \
+    fonts-liberation \
+    xdg-utils \
     libnss3 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
@@ -35,6 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g agent-browser@0.41.2 \
+    && agent-browser install || true \
     && rm -rf /var/lib/apt/lists/*
 
 # Verify agent-browser installation

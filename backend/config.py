@@ -21,7 +21,7 @@ class Settings:
     # Database: Strictly PostgreSQL
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@127.0.0.1:5432/obscura",
+        "postgresql://postgres:postgres@127.0.0.1:5432/automation_platform_db",
     )
     jwt_secret: str = os.getenv("JWT_SECRET", "change-this-development-secret")
     token_expiry_minutes: int = int(os.getenv("TOKEN_EXPIRY_MINUTES", "480"))
@@ -29,7 +29,7 @@ class Settings:
         value.strip()
         for value in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173",
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173",
         ).split(",")
         if value.strip()
     )

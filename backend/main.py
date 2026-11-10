@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -21,12 +23,29 @@ from backend.config import settings
 from backend.db import execute, initialize
 from backend.schemas import AuthRequest, AuthResponse, RunResponse, WorkflowCreate, WorkspaceCreate
 
-initialize()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manages application startup and shutdown lifecycle."""
+    try:
+        initialize()
+        logger.info("Database schema initialized and RBAC roles verified.")
+    except Exception as err:
+        logger.warning(
+            "Database initialization deferred or unavailable at startup: %s. "
+            "Application startup continuing; database calls will connect on demand.",
+            err,
+        )
+    yield
+
 
 app = FastAPI(
     title="AutomationTestingWithAgentBrowser",
     version="1.0.0",
     description="Deterministic Flow & Testing Automation Platform powered by Agent Browser",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

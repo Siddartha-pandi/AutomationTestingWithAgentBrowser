@@ -45,7 +45,7 @@ export function AppContextProvider({ children }: { children: React.ReactNode }) 
     };
   });
 
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string>("exec-run-101");
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string>("");
   const [selectedFlowId, setSelectedFlowId] = useState<string | undefined>(undefined);
   const [selectedTestId, setSelectedTestId] = useState<string | undefined>(undefined);
 

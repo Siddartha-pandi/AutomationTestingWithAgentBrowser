@@ -156,15 +156,30 @@ class ActionRegistry:
             FlowActionType.NAVIGATE: self._handle_navigate,
             FlowActionType.CLICK: self._handle_click,
             FlowActionType.DOUBLE_CLICK: self._handle_double_click,
+            FlowActionType.RIGHT_CLICK: self._handle_right_click,
+            FlowActionType.HOVER: self._handle_hover,
             FlowActionType.FILL: self._handle_fill,
             FlowActionType.TYPE: self._handle_type,
             FlowActionType.SELECT: self._handle_select,
+            FlowActionType.CHECK: self._handle_check,
+            FlowActionType.UNCHECK: self._handle_uncheck,
+            FlowActionType.SCROLL: self._handle_scroll,
             FlowActionType.EXTRACT_TEXT: self._handle_extract_text,
             FlowActionType.EXTRACT_ATTRIBUTE: self._handle_extract_attribute,
             FlowActionType.EXTRACT_TABLE: self._handle_extract_table,
             FlowActionType.WAIT: self._handle_wait,
+            FlowActionType.WAIT_UNTIL: self._handle_wait_until,
+            FlowActionType.BROWSER_BACK: self._handle_browser_back,
+            FlowActionType.BROWSER_FORWARD: self._handle_browser_forward,
+            FlowActionType.REFRESH: self._handle_refresh,
             FlowActionType.CONDITION: self._handle_condition,
+            FlowActionType.SWITCH: self._handle_switch,
             FlowActionType.SET_VARIABLE: self._handle_set_variable,
+            FlowActionType.STRING_OP: self._handle_string_op,
+            FlowActionType.NUMBER_OP: self._handle_number_op,
+            FlowActionType.JSON_OP: self._handle_json_op,
+            FlowActionType.DATE_OP: self._handle_date_op,
+            FlowActionType.ARRAY_OP: self._handle_array_op,
             FlowActionType.SCREENSHOT: self._handle_screenshot,
             FlowActionType.STOP: self._handle_stop,
         }
@@ -360,3 +375,238 @@ class ActionRegistry:
     ) -> StepExecutionResult:
         reason = str(scope.interpolate(config.get("reason", "Workflow stopped normally")))
         return StepExecutionResult(status="passed", result_data={"reason": reason}, next_handle="stop")
+
+    def _handle_right_click(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="right_click", execution_id=execution_id)
+        res = self.adapter.right_click(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "right_clicked": True}, healed_locator=healed_loc)
+
+    def _handle_hover(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="hover", execution_id=execution_id)
+        res = self.adapter.hover(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "hovered": True}, healed_locator=healed_loc)
+
+    def _handle_check(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="check", execution_id=execution_id)
+        res = self.adapter.check(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "checked": True}, healed_locator=healed_loc)
+
+    def _handle_uncheck(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="uncheck", execution_id=execution_id)
+        res = self.adapter.uncheck(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "unchecked": True}, healed_locator=healed_loc)
+
+    def _handle_scroll(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        direction = str(config.get("direction", "down")).lower()
+        amount = int(config.get("amount", 400))
+        target = config.get("target") or {}
+        selector = target.get("selector")
+        res = self.adapter.scroll(session_id, direction=direction, amount=amount, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"direction": direction, "amount": amount, "target": selector})
+
+    def _handle_browser_back(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        res = self.adapter.back(session_id)
+        return StepExecutionResult(status="passed", result_data={"navigated_back": True})
+
+    def _handle_browser_forward(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        res = self.adapter.forward(session_id)
+        return StepExecutionResult(status="passed", result_data={"navigated_forward": True})
+
+    def _handle_refresh(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        res = self.adapter.reload(session_id)
+        return StepExecutionResult(status="passed", result_data={"reloaded": True})
+
+    def _handle_wait_until(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        raw_selector = target.get("selector") or ""
+        timeout_ms = int(config.get("timeout_ms", 10000))
+        condition_type = config.get("condition", "visible")
+
+        start = time.time()
+        deadline = start + (timeout_ms / 1000.0)
+        matched = False
+        while time.time() < deadline:
+            if condition_type == "visible" and self.adapter.is_visible(session_id, raw_selector):
+                matched = True
+                break
+            elif condition_type == "hidden" and not self.adapter.is_visible(session_id, raw_selector):
+                matched = True
+                break
+            elif condition_type == "enabled" and self.adapter.is_enabled(session_id, raw_selector):
+                matched = True
+                break
+            time.sleep(0.5)
+
+        if not matched:
+            raise BrowserActionError(f"Wait until condition '{condition_type}' timed out on selector '{raw_selector}'")
+
+        return StepExecutionResult(status="passed", result_data={"selector": raw_selector, "matched": True})
+
+    def _handle_switch(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        expr = str(scope.interpolate(config.get("expression", "")))
+        cases = config.get("cases", [])  # list of branch names
+        matched_handle = "default"
+        for case in cases:
+            if expr == str(case):
+                matched_handle = str(case)
+                break
+        return StepExecutionResult(status="passed", result_data={"expression": expr, "branch": matched_handle}, next_handle=matched_handle)
+
+    def _handle_string_op(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        op = config.get("operation", "upper").lower()
+        val = str(scope.interpolate(config.get("input", "")))
+        var_name = config.get("output_variable", "string_result")
+
+        if op == "upper":
+            result: Any = val.upper()
+        elif op == "lower":
+            result = val.lower()
+        elif op == "trim":
+            result = val.strip()
+        elif op == "replace":
+            find_str = str(scope.interpolate(config.get("find", "")))
+            replace_str = str(scope.interpolate(config.get("replace", "")))
+            result = val.replace(find_str, replace_str)
+        elif op == "split":
+            delimiter = config.get("delimiter", ",")
+            result = val.split(delimiter)
+        elif op == "length":
+            result = len(val)
+        else:
+            result = val
+
+        scope.set(var_name, result)
+        return StepExecutionResult(status="passed", result_data={"operation": op, "result": result, "variable_name": var_name})
+
+    def _handle_number_op(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        import math
+        op = config.get("operation", "add").lower()
+        var_name = config.get("output_variable", "number_result")
+        num1 = float(scope.interpolate(str(config.get("a", 0))))
+        num2 = float(scope.interpolate(str(config.get("b", 0))))
+
+        if op == "add":
+            res_num: Any = num1 + num2
+        elif op == "subtract":
+            res_num = num1 - num2
+        elif op == "multiply":
+            res_num = num1 * num2
+        elif op == "divide":
+            res_num = num1 / num2 if num2 != 0 else 0
+        elif op == "round":
+            decimals = int(config.get("decimals", 0))
+            res_num = round(num1, decimals)
+        elif op == "abs":
+            res_num = abs(num1)
+        elif op == "min":
+            res_num = min(num1, num2)
+        elif op == "max":
+            res_num = max(num1, num2)
+        else:
+            res_num = num1
+
+        scope.set(var_name, res_num)
+        return StepExecutionResult(status="passed", result_data={"operation": op, "result": res_num, "variable_name": var_name})
+
+    def _handle_json_op(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        import json
+        op = config.get("operation", "parse").lower()
+        var_name = config.get("output_variable", "json_result")
+        inp = scope.interpolate(config.get("input", ""))
+
+        if op == "parse":
+            try:
+                res_json: Any = json.loads(inp) if isinstance(inp, str) else inp
+            except Exception:
+                res_json = {}
+        elif op == "stringify":
+            res_json = json.dumps(inp) if not isinstance(inp, str) else inp
+        elif op == "get_key":
+            key = config.get("key", "")
+            data_dict = json.loads(inp) if isinstance(inp, str) else inp
+            res_json = data_dict.get(key) if isinstance(data_dict, dict) else None
+        else:
+            res_json = inp
+
+        scope.set(var_name, res_json)
+        return StepExecutionResult(status="passed", result_data={"operation": op, "result": res_json, "variable_name": var_name})
+
+    def _handle_date_op(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        from datetime import datetime, timezone, timedelta
+        op = config.get("operation", "now").lower()
+        var_name = config.get("output_variable", "date_result")
+
+        now_utc = datetime.now(timezone.utc)
+        if op == "now":
+            res_date: Any = now_utc.isoformat()
+        elif op == "timestamp":
+            res_date = int(now_utc.timestamp())
+        elif op == "format":
+            fmt = config.get("format", "%Y-%m-%d")
+            res_date = now_utc.strftime(fmt)
+        elif op == "add_days":
+            days = int(config.get("days", 1))
+            res_date = (now_utc + timedelta(days=days)).isoformat()
+        else:
+            res_date = now_utc.isoformat()
+
+        scope.set(var_name, res_date)
+        return StepExecutionResult(status="passed", result_data={"operation": op, "result": res_date, "variable_name": var_name})
+
+    def _handle_array_op(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        op = config.get("operation", "length").lower()
+        var_name = config.get("output_variable", "array_result")
+        inp = config.get("array")
+        arr = inp if isinstance(inp, list) else []
+
+        if op == "length":
+            res_arr: Any = len(arr)
+        elif op == "push":
+            elem = scope.interpolate(config.get("item"))
+            res_arr = list(arr) + [elem]
+        elif op == "join":
+            sep = config.get("separator", ",")
+            res_arr = sep.join(str(x) for x in arr)
+        elif op == "slice":
+            start_idx = int(config.get("start", 0))
+            end_idx = int(config.get("end", len(arr)))
+            res_arr = arr[start_idx:end_idx]
+        else:
+            res_arr = arr
+
+        scope.set(var_name, res_arr)
+        return StepExecutionResult(status="passed", result_data={"operation": op, "result": res_arr, "variable_name": var_name})

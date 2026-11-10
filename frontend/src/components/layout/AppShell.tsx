@@ -44,6 +44,9 @@ import {
   Cpu,
   Activity,
   FileCode,
+  LayoutTemplate,
+  Database,
+  Video,
 } from "lucide-react";
 import { useTheme } from "../common/ThemeProvider";
 import { BrowserAutomationLogo } from "../common/BrowserLogo";
@@ -53,12 +56,15 @@ export type NavView =
   | "automation_all_flows"
   | "automation_builder"
   | "automation_create_flow"
+  | "automation_templates"
   | "automation_schedules"
   | "testing_cases"
   | "testing_suites"
   | "testing_builder"
   | "testing_reports"
+  | "testing_data"
   | "browser_live"
+  | "browser_recorder"
   | "browser_dom"
   | "browser_profiles"
   | "browser_recognition"
@@ -102,6 +108,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "automation_all_flows", label: "All Flows", icon: GitBranch },
       { id: "automation_builder", label: "Flow Builder", icon: Wrench },
       { id: "automation_create_flow", label: "Create Flow", icon: PlusCircle },
+      { id: "automation_templates", label: "Flow Templates", icon: LayoutTemplate },
       { id: "automation_schedules", label: "Schedules", icon: Calendar },
     ],
   },
@@ -112,12 +119,14 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "testing_suites", label: "Test Suites", icon: FolderKanban },
       { id: "testing_builder", label: "Test Builder", icon: FileCode },
       { id: "testing_reports", label: "Test Reports", icon: FileText },
+      { id: "testing_data", label: "Test Data", icon: Database },
     ],
   },
   {
     title: "BROWSER INTELLIGENCE",
     items: [
       { id: "browser_live", label: "Live Browser", icon: Compass },
+      { id: "browser_recorder", label: "Browser Recorder", icon: Video },
       { id: "browser_dom", label: "DOM Explorer", icon: Code2 },
       { id: "browser_profiles", label: "Element Profiles", icon: Crosshair },
       { id: "browser_recognition", label: "Element Recognition", icon: Sparkles },
@@ -296,10 +305,10 @@ export function AppShell({
               <BrowserAutomationLogo size={32} className="shrink-0" />
               <div className="leading-tight truncate">
                 <div className="font-bold text-xs tracking-tight text-white truncate">
-                  AgentBrowser
+                  {process.env.NEXT_PUBLIC_APP_NAME || "AgentFlow"}
                 </div>
                 <div className="text-[10px] text-blue-400 font-medium tracking-wider uppercase truncate">
-                  Automation & Testing
+                  {process.env.NEXT_PUBLIC_COMPANY_NAME || "Enterprise Platform"}
                 </div>
               </div>
             </div>
@@ -330,13 +339,19 @@ export function AppShell({
                   Workspace
                 </span>
                 <span className="font-bold text-slate-100 truncate text-xs">
-                  {currentProject?.name || "Enterprise QA Suite"}
+                  {currentProject?.name || "No Project Selected"}
                 </span>
               </div>
             </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 font-mono">
-              Active
-            </span>
+            {currentProject?.id ? (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800 font-mono">
+                Active
+              </span>
+            ) : (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800 font-mono">
+                None
+              </span>
+            )}
           </button>
         )}
 

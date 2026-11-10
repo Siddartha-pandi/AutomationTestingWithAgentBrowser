@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Compass,
   Play,
@@ -15,7 +15,10 @@ import {
   Lock,
   ExternalLink,
   Laptop,
+  Loader2,
+  Maximize2,
 } from "lucide-react";
+import { browserApi } from "@/api";
 import { useToast } from "../common/ToastProvider";
 import { NavView } from "../layout/AppShell";
 
@@ -25,75 +28,169 @@ interface LiveBrowserPageProps {
 }
 
 export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps) {
-  const [sessionActive, setSessionActive] = useState(true);
-  const [sessionId, setSessionId] = useState("sess-agent-0412-obscura");
-  const [currentUrl, setCurrentUrl] = useState("https://staging.internal.company.net/auth");
-  const [inputUrl, setInputUrl] = useState("https://staging.internal.company.net/auth");
-  const [browserStatus, setBrowserStatus] = useState<"Connected" | "Navigating" | "Idle" | "Terminated">("Connected");
-  const [viewportScreenshot, setViewportScreenshot] = useState<string | null>(
-    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='800' height='450' fill='%230f172a'/><text x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' fill='%2338bdf8' font-family='sans-serif' font-size='18' font-weight='bold'>agent-browser CLI 0.41.2 Session</text><text x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='%2394a3b8' font-family='monospace' font-size='13'>https://staging.internal.company.net/auth</text></svg>"
-  );
+  const [sessionActive, setSessionActive] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [currentUrl, setCurrentUrl] = useState("");
+  const [inputUrl, setInputUrl] = useState("https://mahila-action-vsk.vercel.app/home?modal=login");
+  const [browserStatus, setBrowserStatus] = useState<"Connected" | "Navigating" | "Idle" | "Terminated">("Idle");
+  const [viewportScreenshot, setViewportScreenshot] = useState<string | null>(null);
+  const [browserLogs, setBrowserLogs] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [browserLogs, setBrowserLogs] = useState<string[]>([
-    "[09:14:02.110] [CLI] agent-browser --session-name obscura-automation daemon started.",
-    "[09:14:02.145] [SECURITY] Approved domain whitelist verified (staging.internal.company.net).",
-    "[09:14:02.820] [NAVIGATE] Successfully navigated to https://staging.internal.company.net/auth (HTTP 200).",
-    "[09:14:03.100] [DOM] Extracted 42 accessibility nodes. ARIA trees synchronized.",
-    "[09:14:03.450] [STATE] Viewport 1280x800 ready for deterministic interaction.",
-  ]);
-
+  const sessionIdRef = useRef<string>("");
+  const logsEndRef = useRef<HTMLDivElement | null>(null);
   const { success, error, warning, info } = useToast();
 
-  const handleStartSession = () => {
-    setSessionActive(true);
-    setBrowserStatus("Connected");
-    setSessionId(`sess-${Date.now().toString(36)}`);
-    setBrowserLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] [SESSION] Initialized new isolated Agent Browser CLI process.`,
-    ]);
-    success("Browser Session Started", "agent-browser subprocess launched in isolated container.");
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  // Clean up session on unmount
+  useEffect(() => {
+    return () => {
+      if (sessionIdRef.current) {
+        browserApi.close(sessionIdRef.current).catch(() => {});
+      }
+    };
+  }, []);
+
+  // Auto-scroll logs
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [browserLogs]);
+
+  const addLog = (tag: string, message: string) => {
+    const time = new Date().toLocaleTimeString();
+    setBrowserLogs((prev) => [...prev, `[${time}] [${tag}] ${message}`]);
   };
 
-  const handleStopSession = () => {
-    setSessionActive(false);
-    setBrowserStatus("Terminated");
-    setBrowserLogs((prev) => [
-      ...prev,
-      `[${new Date().toLocaleTimeString()}] [SESSION] Closed Agent Browser CLI session.`,
-    ]);
-    warning("Session Terminated", "Browser process exited.");
+  const ensureSession = async (): Promise<string> => {
+    if (sessionActive && sessionIdRef.current) {
+      return sessionIdRef.current;
+    }
+    setIsLoading(true);
+    addLog("SESSION", "Spawning new isolated Agent Browser CLI process...");
+    try {
+      const res = await browserApi.launch({
+        project_id: projectId || undefined,
+        allowed_domains: ["*"],
+      });
+      const newId = res.session_id;
+      setSessionId(newId);
+      sessionIdRef.current = newId;
+      setSessionActive(true);
+      setBrowserStatus("Connected");
+      addLog("SESSION", `Isolated Agent Browser session initialized (${newId}).`);
+      success("Browser Started", `Session ${newId} ready.`);
+      return newId;
+    } catch (err: any) {
+      addLog("ERROR", `Failed to launch browser: ${err.message}`);
+      error("Launch Error", err.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleNavigate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sessionActive) {
-      error("No Active Session", "Please start a browser session first.");
+  const handleStartSession = async () => {
+    try {
+      await ensureSession();
+    } catch {
+      // Error handled in ensureSession
+    }
+  };
+
+  const handleStopSession = async () => {
+    if (!sessionId) return;
+    setIsLoading(true);
+    addLog("SESSION", `Terminating session ${sessionId}...`);
+    try {
+      await browserApi.close(sessionId);
+      setSessionActive(false);
+      setSessionId("");
+      sessionIdRef.current = "";
+      setBrowserStatus("Terminated");
+      setViewportScreenshot(null);
+      addLog("SESSION", "Agent Browser CLI subprocess exited cleanly.");
+      warning("Session Terminated", "Browser process closed.");
+    } catch (err: any) {
+      addLog("ERROR", `Error closing session: ${err.message}`);
+      error("Close Error", err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNavigate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    let target = inputUrl.trim();
+    if (!target) return;
+    if (!target.startsWith("http://") && !target.startsWith("https://")) {
+      target = `https://${target}`;
+      setInputUrl(target);
+    }
+
+    try {
+      setIsLoading(true);
+      const activeId = await ensureSession();
+
+      setBrowserStatus("Navigating");
+      addLog("NAVIGATE", `Navigating to ${target}...`);
+      info("Navigating", `Requesting ${target}...`);
+
+      const res = await browserApi.navigate(activeId, target, 35);
+
+      setCurrentUrl(target);
+      setBrowserStatus("Connected");
+
+      if (res.image_base64) {
+        setViewportScreenshot(res.image_base64);
+        addLog("VIEWPORT", `Live frame rendered (${target}).`);
+      } else {
+        // Fallback: request screenshot explicitly
+        try {
+          const shot = await browserApi.screenshot(activeId);
+          if (shot.image_base64) {
+            setViewportScreenshot(shot.image_base64);
+            addLog("VIEWPORT", `Live frame captured via snapshot.`);
+          }
+        } catch {
+          // Ignore fallback error
+        }
+      }
+
+      addLog("NAVIGATE", `Page loaded: ${target} (${res.duration_ms ? `${res.duration_ms}ms` : "HTTP 200"}).`);
+      success("Page Loaded", `Viewport updated for ${target}`);
+    } catch (err: any) {
+      setBrowserStatus("Connected");
+      addLog("ERROR", `Navigation failed: ${err.message}`);
+      error("Navigation Failed", err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTakeScreenshot = async () => {
+    if (!sessionId) {
+      error("No Active Session", "Please start or navigate first.");
       return;
     }
-    setBrowserStatus("Navigating");
-    info("Navigating", `Agent Browser navigating to ${inputUrl}...`);
-    setTimeout(() => {
-      setCurrentUrl(inputUrl);
-      setBrowserStatus("Connected");
-      setBrowserLogs((prev) => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] [NAVIGATE] Navigated to ${inputUrl} (HTTP 200).`,
-      ]);
-      success("Page Loaded", `Active viewport updated.`);
-    }, 1200);
-  };
-
-  const handleTakeScreenshot = () => {
-    if (!sessionActive) return;
-    info("Capturing Screenshot", "Requesting full viewport frame from agent-browser...");
-    setTimeout(() => {
-      setBrowserLogs((prev) => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] [SCREENSHOT] Viewport captured to ./reports/screenshots/live_${Date.now()}.png`,
-      ]);
-      success("Screenshot Captured", "Stored in private compliant artifact storage.");
-    }, 800);
+    setIsLoading(true);
+    addLog("SCREENSHOT", "Requesting full viewport frame from agent-browser...");
+    try {
+      const res = await browserApi.screenshot(sessionId, { full_page: false });
+      if (res.image_base64) {
+        setViewportScreenshot(res.image_base64);
+      }
+      addLog("SCREENSHOT", `Captured live viewport frame (${res.file_size || 0} bytes).`);
+      success("Screenshot Captured", "Viewport frame refreshed.");
+    } catch (err: any) {
+      addLog("ERROR", `Screenshot failed: ${err.message}`);
+      error("Screenshot Failed", err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -106,7 +203,7 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
             <span>Live Browser Monitor</span>
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Direct subprocess controller and screenshot observer for the Agent Browser CLI engine.
+            Direct subprocess controller and live screenshot observer powered by Agent Browser CLI.
           </p>
         </div>
 
@@ -114,7 +211,8 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
           {sessionActive ? (
             <button
               onClick={handleStopSession}
-              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
+              disabled={isLoading}
+              className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
               <Square className="w-3.5 h-3.5" />
               <span>Stop Session</span>
@@ -122,17 +220,22 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
           ) : (
             <button
               onClick={handleStartSession}
-              className="px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
+              disabled={isLoading}
+              className="px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
-              <Play className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Play className="w-3.5 h-3.5" />
+              )}
               <span>Start Session</span>
             </button>
           )}
 
           <button
             onClick={handleTakeScreenshot}
-            disabled={!sessionActive}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition disabled:opacity-40"
+            disabled={!sessionActive || isLoading}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition disabled:opacity-40 cursor-pointer"
           >
             <Camera className="w-4 h-4 text-purple-500" />
             <span>Capture Screenshot</span>
@@ -144,39 +247,62 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
       <div className="p-4 rounded-xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs">
         <form onSubmit={handleNavigate} className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-2 flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100">
-            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+            <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <input
-              type="url"
+              type="text"
               required
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="https://staging.internal.company.net"
+              placeholder="https://example.com"
               className="w-full bg-transparent border-none focus:outline-none font-mono text-xs"
             />
           </div>
 
           <button
             type="submit"
-            disabled={!sessionActive}
-            className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold flex items-center gap-1.5 transition disabled:opacity-50"
+            disabled={isLoading}
+            className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
           >
+            {isLoading && browserStatus === "Navigating" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : null}
             <span>Navigate</span>
           </button>
 
           <button
             type="button"
-            onClick={handleNavigate}
-            disabled={!sessionActive}
-            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+            onClick={() => handleNavigate()}
+            disabled={isLoading || !currentUrl}
+            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition disabled:opacity-40 cursor-pointer"
             title="Refresh Page"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
+
+          {currentUrl && (
+            <a
+              href={currentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+              title="Open Target in New Tab"
+            >
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
         </form>
 
         <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Current Target: <strong className="text-slate-700 dark:text-slate-300 font-mono">{currentUrl}</strong></span>
-          <span className="font-mono">Session ID: <strong className="text-blue-600">{sessionId}</strong></span>
+          <span>
+            Current Target:{" "}
+            <strong className="text-slate-700 dark:text-slate-300 font-mono">
+              {currentUrl || "None"}
+            </strong>
+          </span>
+          <span className="font-mono">
+            Session ID:{" "}
+            <strong className="text-blue-600">{sessionId || "Disconnected"}</strong>
+          </span>
         </div>
       </div>
 
@@ -192,7 +318,11 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
               </h3>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${sessionActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  sessionActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                }`}
+              />
               <span className="text-[11px] font-mono font-semibold capitalize text-slate-700 dark:text-slate-300">
                 {browserStatus}
               </span>
@@ -200,6 +330,15 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
           </div>
 
           <div className="w-full aspect-video rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center relative shadow-inner">
+            {isLoading && (
+              <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-2xs flex flex-col items-center justify-center gap-2 z-10 animate-in fade-in">
+                <Loader2 className="w-7 h-7 text-[#2563EB] animate-spin" />
+                <span className="text-xs font-mono text-slate-300">
+                  {browserStatus === "Navigating" ? "Navigating and rendering DOM..." : "Capturing viewport..."}
+                </span>
+              </div>
+            )}
+
             {viewportScreenshot ? (
               <img
                 src={viewportScreenshot}
@@ -207,8 +346,14 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
                 className="w-full h-full object-contain"
               />
             ) : (
-              <div className="text-slate-500 text-xs italic">
-                Browser session idle. Navigate to view current DOM rendering.
+              <div className="text-center p-8 space-y-2">
+                <Compass className="w-8 h-8 text-slate-600 mx-auto" />
+                <div className="text-slate-400 text-xs font-medium">
+                  Browser session idle.
+                </div>
+                <div className="text-slate-600 text-[11px]">
+                  Click <strong>Navigate</strong> above to launch and view the live DOM rendering.
+                </div>
               </div>
             )}
           </div>
@@ -225,18 +370,23 @@ export function LiveBrowserPage({ projectId, onNavigate }: LiveBrowserPageProps)
             </div>
             <button
               onClick={() => setBrowserLogs([])}
-              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
             >
               Clear
             </button>
           </div>
 
-          <div className="flex-1 bg-slate-950 rounded-xl p-3 font-mono text-[11px] text-slate-300 overflow-y-auto max-h-96 space-y-1.5 scrollbar-thin">
-            {browserLogs.map((log, index) => (
-              <div key={index} className="leading-tight break-all">
-                {log}
-              </div>
-            ))}
+          <div className="flex-1 bg-slate-950 rounded-xl p-3 font-mono text-[11px] text-slate-300 overflow-y-auto max-h-96 min-h-[300px] space-y-1.5 scrollbar-thin">
+            {browserLogs.length === 0 ? (
+              <div className="text-slate-600 italic">No activity logs recorded yet.</div>
+            ) : (
+              browserLogs.map((log, index) => (
+                <div key={index} className="leading-tight break-all">
+                  {log}
+                </div>
+              ))
+            )}
+            <div ref={logsEndRef} />
           </div>
 
           {/* Zero-AI Note */}

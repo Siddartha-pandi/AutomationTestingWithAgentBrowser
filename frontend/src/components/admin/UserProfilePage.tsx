@@ -26,8 +26,8 @@ interface UserProfilePageProps {
 }
 
 export function UserProfilePage({ user, onLogout, onNavigate }: UserProfilePageProps) {
-  const [fullName, setFullName] = useState(user?.full_name || "Lead Administrator");
-  const [email, setEmail] = useState(user?.email || "admin@company.internal");
+  const [fullName, setFullName] = useState(user?.full_name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

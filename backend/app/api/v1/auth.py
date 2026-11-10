@@ -69,16 +69,6 @@ def register(
         roles=[role],
     )
     db.add(new_user)
-    db.flush()
-
-    # Automatically create user's initial project
-    project_name = f"{new_user.full_name}'s Workspace"
-    initial_project = Project(
-        name=project_name,
-        description="Default organization workspace",
-        owner_id=new_user.id,
-    )
-    db.add(initial_project)
     db.commit()
     db.refresh(new_user)
 

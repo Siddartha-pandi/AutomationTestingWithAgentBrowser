@@ -6,6 +6,7 @@ from backend.app.api.v1.artifacts import router as artifacts_router
 from backend.app.api.v1.audit import router as audit_router
 from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.browser import router as browser_router
+from backend.app.api.v1.recorder import router as recorder_router
 from backend.app.api.v1.credentials import router as credentials_router
 from backend.app.api.v1.dom import router as dom_router
 from backend.app.api.v1.elements import router as elements_router
@@ -39,8 +40,9 @@ api_v1_router.include_router(tests_router)
 api_v1_router.include_router(test_suites_router)
 api_v1_router.include_router(schedules_router)
 
-# Browser Intelligence & Self-Healing
+# Browser Intelligence, Recorder & Self-Healing
 api_v1_router.include_router(browser_router)
+api_v1_router.include_router(recorder_router)
 api_v1_router.include_router(dom_router)
 api_v1_router.include_router(elements_router)
 api_v1_router.include_router(healing_router)

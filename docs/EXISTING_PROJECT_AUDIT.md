@@ -1,150 +1,196 @@
-# Existing Project Audit: AutomationTestingWithAgentBrowser
-**Document Version:** 1.0.0  
-**Audit Date:** November 9, 2026  
-**Auditor:** Senior Software Architect & Browser Automation Specialist  
-**Status:** Completed (Phase 0)  
+# Comprehensive Existing Project Audit: AutomationTestingWithAgentBrowser
+
+**Document Version:** 2.0.0  
+**Audit Date:** November 10, 2026  
+**Auditor:** Principal Software Architect & Browser Automation Engineer  
+**Status:** Completed (Phase 0 Audit)  
+**Company Policy Compliance:** ZERO-AI Data Protection Policy (Verified)  
+**Primary Engine:** Agent Browser CLI (`0.41.2`) Subprocess Adapter  
 
 ---
 
 ## 1. Executive Summary
 
-This audit evaluates the current state of the `AutomationTestingWithAgentBrowser` repository (originally referenced as `AgentBrowserAutomation`) prior to architectural upgrades. The project goal is to build an enterprise-grade, multi-user web platform providing Flow Automation, Testing Automation, Visual Builders, Deterministic DOM Extraction, Rule-Based Element Recognition, Deterministic Self-Healing, and Scheduled Execution powered exclusively by the installed **Agent Browser CLI**, under a strict **Zero-AI Company Data Protection Policy**.
+This audit provides a comprehensive, rigorous technical evaluation of the `AutomationTestingWithAgentBrowser` repository. The goal is to upgrade the application into an enterprise-grade, multi-user Browser Flow Automation and Testing Automation platform inspired by the public design principles of **Automa** (visual browser workflows), **WrightTest** (browser test management & recording), and **n8n** (visual orchestration & execution management).
 
-### Key Findings Summary:
-1. **Agent Browser CLI is verified and installed**: `agent-browser` version `0.41.2` is installed locally (`C:\Users\Sidda\AppData\Roaming\npm\agent-browser.cmd`). It provides rich, native CLI commands for browser lifecycle management, session isolation (`--session`), accessibility tree snapshots (`snapshot --json`), semantic querying (`find`), element inspection (`get`, `is`), JavaScript evaluation (`eval -b`), and native domain restriction (`AGENT_BROWSER_ALLOWED_DOMAINS`).
-2. **Mandatory Company Security Policy Violations Detected**:
-   - Both `.env` and `.env.example` in the repository root contain `OLLAMA_ENDPOINT=http://127.0.0.1:11434` and `OLLAMA_MODEL=llama3.2`.
-   - **Company Policy strictly prohibits all AI models, including local LLMs like Ollama.** These entries must be permanently removed and purged during the configuration cleanup.
-3. **Existing Repository Structure**:
-   - A preliminary SaaS scaffold exists with `backend/` (FastAPI), `frontend/` (Vite/React with a partial Next.js file layout), and `reports/` (containing `saas.sqlite3` with smoke test schema and artifact directories).
-   - The standalone script directories `core/` (`browser.py`, `helpers.py`) and `tests/` (`test_login.py`, `test_referral.py`, `test_fvr_status.py`, `test_dashboard.py`) mentioned in legacy descriptions are not physically present in the root. The repository `README.md` documents:
-     ```text
-     The project now contains only the SaaS application:
-     AgentBrowserAutomation/
-     ├── backend/   # FastAPI API, local authentication, workspaces, workflows
-     ├── frontend/  # React/Vite dashboard
-     └── reports/   # Runtime report artifacts and local smoke-test data
-     ```
-     The four business workflows (Login, Referral Submission, FVR Status Verification, and Dashboard Analytics) must be reconstructed as first-class, verified platform test cases and flow definitions.
-4. **Backend Architecture Gaps**:
-   - The current `backend/db.py` uses raw SQL queries with a makeshift switcher between SQLite and `pg8000`, integer auto-increment IDs, and a 5-table schema.
-   - Missing SQLAlchemy 2.0 ORM models, Alembic migrations, UUID primary keys, and support for the 19 required database tables (users, roles, projects, environments, credentials, automation_definitions, definition_versions, schedules, executions, execution_steps, execution_logs, element_profiles, locator_history, healing_events, dom_snapshots, artifacts, approvals, audit_logs).
-   - Missing Redis & Celery task execution queues and workers.
-5. **Frontend Architecture Gaps**:
-   - `frontend/package.json` contains a hybrid of Vite (`vite: ^6.0.5`) and Next.js (`next: ^16.4.5`).
-   - The UI is currently a single-file prototype (`frontend/src/main.tsx`) lacking React Flow, Recharts, Lucide icons, Shadcn UI components, and the 7 required enterprise SaaS navigation modules.
+### Core Architectural Guardrails:
+1. **Mandatory Company AI Policy (NO_DATA):** Strictly zero OpenAI, Gemini, Claude, external AI APIs, local LLMs (Ollama, vLLM), AI embeddings, or AI-generated workflows. All selector resolution, candidate scoring, and self-healing must use transparent, deterministic algorithms and traditional software engineering.
+2. **Sole Browser Engine:** `agent-browser` CLI (`0.41.2`) is the **ONLY** browser automation engine. No Playwright, Selenium, Puppeteer, or Browser Use.
+3. **Enterprise Stack:** Next.js (App Router), TypeScript, Tailwind CSS, React Flow (`@xyflow/react`), Python FastAPI, PostgreSQL (SQLAlchemy 2.0 + Alembic), Redis + Celery, Recharts, and Lucide React.
 
 ---
 
-## 2. Inventory of Current Codebase
+## 2. Codebase Inventory & Directory Structure
 
-### 2.1 Root Configuration Files
-| File | Size | Purpose | Observations & Audit Notes |
-| :--- | :--- | :--- | :--- |
-| `.env` | 795 B | Environment variables | Contains live Neon PostgreSQL connection string and prohibited `OLLAMA_*` variables. Needs immediate remediation. |
-| `.env.example` | 610 B | Template environment variables | Contains prohibited `OLLAMA_*` configuration. Must be cleaned. |
-| `.gitignore` | 65 B | Git ignore rules | Standard node/python ignores; needs expansion for reports, celery, alembic, and secret files. |
-| `Makefile` | 790 B | Build shortcuts | Contains basic make targets (`install`, `backend`, `frontend`, `build`). |
-| `README.md` | 1.38 KB | Documentation | Documents SaaS mode with FastAPI backend, React frontend, and PostgreSQL/SQLite setup. |
-| `.vscode/settings.json` | 44 B | Editor settings | Configures basic editor defaults. |
-
-### 2.2 Backend (`backend/`)
-| File | Lines | Current Functionality | Architectural Gap vs Requirements |
-| :--- | :--- | :--- | :--- |
-| `backend/main.py` | 130 | FastAPI app entry point; routes for auth register/login, workspaces, workflows, and queuing placeholder runs. | Uses raw SQL queries, lacks versioned prefix (`/api/v1/`), lacks RBAC, lacks execution engine connection. |
-| `backend/db.py` | 152 | Database wrapper with dual sqlite3 / pg8000 support, `_PostgresConnection` wrapper. | Missing SQLAlchemy 2.0 ORM, Alembic migrations, connection pooling, and UUID schema. |
-| `backend/config.py` | 28 | Dataclass settings loaded from `.env`. | Lacks typed Pydantic Settings, Celery/Redis settings, security policy settings, browser timeout settings. |
-| `backend/security.py` | 56 | Scrypt password hashing, homemade HMAC-SHA256 JWT-like bearer tokens. | Custom token format (`base64.signature`) without standard JWT claims, no RBAC permissions check, no secret redaction. |
-| `backend/schemas.py` | 51 | Pydantic models for Auth, Workspace, Workflow, Run. | Minimal schema models; lacks models for tests, assertions, element profiles, healing events, environments, schedules. |
-| `backend/requirements.txt` | 5 lines | Lists `fastapi`, `uvicorn`, `pydantic`, `pg8000`, `python-dotenv`. | Python environment already has `SQLAlchemy 2.1.8`, `RapidFuzz 3.14.6`, `Levenshtein 0.27.5`, `psycopg 3.3.8`. Missing `celery`, `redis`, `alembic` in requirements file. |
-
-### 2.3 Frontend (`frontend/`)
-| File | Lines | Current Functionality | Architectural Gap vs Requirements |
-| :--- | :--- | :--- | :--- |
-| `package.json` | 24 | Dependencies: Next.js 16.4.5, React 19.3.1, Vite 6.0.5. | Missing `@xyflow/react` (React Flow), `lucide-react`, `recharts`, `radix-ui` / Shadcn dependencies. |
-| `src/main.tsx` | 147 | Vite Single-Page Dashboard with minimal state (Overview, Workflows, Runs, Reports). | Lacks Visual Flow Builder, Visual Test Builder, Live Browser, DOM Explorer, RBAC view, and dark/light mode toggle. |
-| `src/styles.css` | 260 | Custom CSS styling for the Vite prototype. | Lacks Tailwind CSS and Shadcn enterprise design tokens. |
-| `src/api.ts` | 50 | Fetch wrapper for `/api/auth` and `/api/workspaces`. | Needs full typed API client for `/api/v1/*` with token refresh and error handling. |
-| `src/app/layout.tsx` | 19 | Next.js root layout. | Next.js App Router entry exists alongside Vite config; needs unified Next.js App Router structure. |
-| `src/app/globals.css` | 260 | CSS for Next.js layout. | Duplicate styling with `src/styles.css`. |
-
-### 2.4 Reports and Data (`reports/`)
-| Directory / File | Content | Status |
-| :--- | :--- | :--- |
-| `reports/saas.sqlite3` | 36 KB SQLite DB | Contains 1 registered smoke-test user (`siddharthapandi@gmail.com`), 0 workflows. |
-| `reports/dom_snapshots/` | `.gitkeep` | Empty snapshot storage directory. |
-| `reports/execution_reports/`| `.gitkeep` | Empty execution report directory. |
-| `reports/healing_history/` | `.gitkeep` | Empty healing event history directory. |
-| `reports/logs/` | `.gitkeep` | Empty execution log directory. |
-| `reports/screenshots/` | `.gitkeep` | Empty screenshot storage directory. |
-
----
-
-## 3. Verified Agent Browser CLI Audit
-
-The local runtime was thoroughly probed for `agent-browser` availability, CLI version, and capabilities:
-
-```powershell
-PS C:\Prama\AutomationTestingWithAgentBrowser> agent-browser --version
-agent-browser 0.41.2
+```text
+AutomationTestingWithAgentBrowser/
+├── .agent-browser/            # Local Agent Browser daemon session sockets & PID files
+├── alembic/                   # Database migration framework
+│   ├── env.py                 # Alembic environment configured for PostgreSQL & SQLAlchemy Base
+│   └── versions/              # 26e1d42bde30_create_initial_enterprise_tables.py (19 tables)
+├── backend/                   # Python FastAPI Backend Service
+│   ├── app/
+│   │   ├── api/v1/            # 18 versioned REST API routers (/api/v1/*)
+│   │   ├── browser/           # Pure Agent Browser CLI subprocess adapter
+│   │   ├── db/                # SQLAlchemy session lifecycle & declarative Base
+│   │   ├── engine/            # Flow execution DAG traversal & Test Runner
+│   │   │   ├── flows/         # ActionRegistry, FlowExecutor, FlowGraphDefinition, VariableScope
+│   │   │   └── testing/       # AssertionEngine, TestRunner, TestCaseDefinition, LegacyMigration
+│   │   ├── intelligence/      # Multi-factor deterministic recognition & self-healing
+│   │   ├── models/            # 19 SQLAlchemy 2.0 ORM models with UUID primary keys
+│   │   ├── reports/           # Tamper-evident cryptographic report generation (SHA-256)
+│   │   ├── schemas/           # Pydantic v2 validation models
+│   │   ├── security/          # Scrypt password hashing, RFC JWTs, AES-256 GCM secrets, RBAC
+│   │   └── worker/            # Celery background tasks & Celery Beat scheduler
+│   ├── config.py              # Application settings (strictly PostgreSQL, rejects SQLite)
+│   ├── db.py                  # Database connection helpers, role & superuser seeding
+│   ├── main.py                # FastAPI entry point & legacy backward-compatible routes
+│   └── requirements.txt       # Python package dependencies
+├── docs/                      # Enterprise documentation & architectural specifications
+│   ├── EXISTING_PROJECT_AUDIT.md
+│   ├── FEATURE_GAP_ANALYSIS.md
+│   ├── IMPLEMENTATION_ROADMAP.md
+│   ├── SECURITY_DESIGN.md
+│   └── USER_MANUAL.md
+├── frontend/                  # Next.js 16.4.5 + React 19 Frontend Application
+│   ├── public/                # Icons and static web assets
+│   ├── src/
+│   │   ├── app/               # Next.js App Router ((public), (authenticated))
+│   │   ├── components/        # Enterprise SaaS modular components
+│   │   │   ├── admin/         # Users, Roles, Audit Logs, User Profile
+│   │   │   ├── auth/          # Enterprise Login & Register Forms
+│   │   │   ├── browser/       # Live Browser, DOM Explorer, Element Profiles, Recognition, Self-Healing
+│   │   │   ├── common/        # ThemeProvider, ToastProvider, ConfirmModal, BrowserLogo
+│   │   │   ├── config/        # Projects, Environments, Credentials, Browser Settings
+│   │   │   ├── dashboard/     # Executive Overview & Recharts Analytics
+│   │   │   ├── executions/    # Running, History, Details, Logs, Screenshots Gallery
+│   │   │   ├── flows/         # All Flows, Visual Flow Builder (React Flow), Schedules
+│   │   │   ├── layout/        # AppShell (Navy Sidebar, Topbar, Search, Notifications)
+│   │   │   ├── testing/       # Test Cases, Test Suites, Visual Test Builder, Reports
+│   │   │   └── workspace/     # AuthenticatedWorkspace (25-view stateful dispatcher)
+│   │   ├── context/           # AuthContext (JWT) and AppContext (Active Project/View state)
+│   │   └── api.ts             # Typed fetch API client for /api/v1/*
+│   ├── package.json           # Dependencies: @xyflow/react, lucide-react, recharts, tailwindcss
+│   └── tsconfig.json          # TypeScript strict configuration (Compiles with 0 errors)
+├── reports/                   # Secured local file storage for runtime artifacts
+│   ├── dom_snapshots/         # Raw JSON DOM snapshots
+│   ├── execution_reports/     # Generated forensic execution summaries
+│   ├── healing_history/       # Historical healing audit records
+│   ├── logs/                  # Redacted execution stream logs
+│   ├── screenshots/           # Screenshot PNG artifacts
+│   └── sessions/              # Isolated browser session working directories
+├── scripts/
+│   └── verify_zero_ai_policy.py  # Zero-AI policy automated compliance auditor
+└── tests/                     # Automated pytest suite (11 test files, 150+ assertions)
 ```
 
-### Verified CLI Capabilities vs Project Requirements
+---
 
-| Requirement | Agent Browser CLI Capability | CLI Syntax / Verified Flag | Safety & Integration Strategy |
+## 3. Detailed Component-by-Component Audit
+
+### 3.1 Agent Browser CLI Integration (`backend/app/browser/`)
+- **CLI Binary:** `agent-browser` version `0.41.2` locally installed at `C:\Users\Sidda\AppData\Roaming\npm\agent-browser.cmd`.
+- **Architecture:** Communicates via Python `subprocess.Popen` with explicit timeouts, structured JSON argument parsing (`--json`), and isolated sessions (`--session <uuid>`).
+- **Implemented Actions:**
+  - `open <url>`: Navigation with URL validation and strict domain allowlist checking.
+  - `snapshot -i -c --json`: Interactive accessibility tree snapshot with `@e1`, `@e2` element references.
+  - `eval -b <base64>`: Base64-encoded deterministic DOM crawler extracting 500+ nodes with tags, stable attributes, ARIA roles, accessible names, ancestors, and bounding boxes without shell quoting glitches.
+  - User Actions: `click`, `dblclick`, `fill`, `type`, `select`, `wait`.
+  - State Verification: `is visible`, `is enabled`, `is checked`.
+  - Getters: `get text`, `get attr`, `get value`, `get html`, `get title`, `get url`, `get count`.
+  - Artifacts: Native full-page and element screenshots with SHA-256 digest computation.
+- **Identified Gaps & Actions Missing:**
+  - Browser actions missing from CLI adapter: `hover`, `scroll`, `back`, `forward`, `reload`, and `right-click`.
+  - Checkbox/Radio explicit toggle action helper (currently requires click + verification).
+- **Host Environment Observation:**
+  - On this Windows machine, `agent-browser-win32-x64.exe` in `AppData\Roaming\npm\node_modules\agent-browser\bin\` is blocked by Windows Device Guard / WDAC policy unless executed in an approved execution context. The adapter gracefully catches this condition and logs actionable diagnostics.
+
+### 3.2 Database Schema & Migrations (`backend/app/models/`, `alembic/`)
+- **Engine:** Strictly PostgreSQL. SQLite is explicitly blocked in configuration.
+- **Models Implemented (19 Tables):**
+  1. `users`: UUID PK, unique email, scrypt hash, full name, is_active, is_superuser.
+  2. `roles`: UUID PK, name (`owner`, `admin`, `developer`, `tester`, `viewer`), permissions JSONB.
+  3. `user_roles`: Many-to-many junction table.
+  4. `projects`: Organizational tenant isolating flows, tests, and environments.
+  5. `environments`: Execution environment with `base_url`, `allowed_domains` JSONB, and AES-256 encrypted variables.
+  6. `credentials`: Encrypted credential vault (username_password, api_token, bearer_token) with domain scope.
+  7. `automation_definitions`: Container for visual flows and test definitions (`type='flow'|'test'|'test_suite'`).
+  8. `definition_versions`: Immutable version records with `definition_json` JSONB and SHA-256 checksums.
+  9. `schedules`: Cron-based schedules with `Asia/Kolkata` default timezone.
+  10. `executions`: Discrete run records pinned to immutable version IDs with session ID, duration, and summary.
+  11. `execution_steps`: Per-step results, duration, inputs, outputs, error messages, and screenshot paths.
+  12. `execution_logs`: Structured log stream with level and automatic secret redaction flag.
+  13. `element_profiles`: Resilient element profiles with logical IDs, stable attributes, and structural fingerprints.
+  14. `locator_history`: Historical verified locators with success counts.
+  15. `healing_events`: Self-healing decisions (`auto_healed`, `requires_approval`, `rejected`), confidence scores, and breakdowns.
+  16. `approvals`: Human-in-the-loop approval gates for ambiguous or destructive self-healing.
+  17. `artifacts`: Binary metadata (screenshots, HARs, traces) with SHA-256 integrity digests.
+  18. `dom_snapshots`: Full extracted DOM trees with page URL and element count.
+  19. `audit_logs`: Tamper-evident audit trail for security events and configuration changes.
+- **Identified Gaps vs Master Specification:**
+  - Missing `project_members` junction table (currently projects only have `owner_id`).
+  - Flows and Tests currently share `automation_definitions` and `executions` tables via polymorphic `type` column rather than dedicated `test_cases`, `test_suites`, `test_suite_items`, `flow_executions`, and `test_executions` entities.
+
+### 3.3 Backend API Routes (`backend/app/api/v1/`)
+- Complete versioned REST API (`/api/v1/*`) registered across 18 modules.
+- Input validation enforced by Pydantic v2 schemas.
+- Granular RBAC enforced by FastAPI dependency injection (`require_permission(...)`).
+- Secret Redactor sanitizes passwords, bearer tokens, and credentials in logs and step inputs.
+- **Identified Gaps:**
+  - Missing `/api/v1/recorder` router for browser recording sessions.
+  - Startup bug in `backend/main.py:24`: Top-level call to `initialize()` attempts immediate connection to remote database on import, failing in offline sandbox mode. Needs migration to FastAPI `lifespan` handler.
+
+### 3.4 Frontend Architecture & UI (`frontend/`)
+- **Technology:** Next.js 16.4.5 App Router, React 19.3.1, TypeScript 5.7.2, Tailwind CSS 3.4.19, `@xyflow/react` 12.12.1, Recharts 3.10.1, Lucide React 1.71.0.
+- **Design System:** Dark navy sidebar (`#0B0F17` / `#161F30`), light workspace, blue primary accents (`#2563EB`), crisp Lucide icons, responsive tables, and light/dark theme toggle.
+- **TypeScript Status:** Compiles cleanly with **0 errors** (`npx tsc --noEmit` exits with code 0).
+- **Navigation & Workspace Structure:**
+  - `AppShell.tsx` implements responsive collapsible sidebar, breadcrumbs, search shortcut (Ctrl+K), notifications popover, profile drawer, and quick status pills.
+  - `AuthenticatedWorkspace.tsx` manages view switching across 25 views.
+- **Identified Gaps vs Section 4 Specification:**
+  - Sidebar missing 3 navigation items:
+    - AUTOMATION -> **Flow Templates**
+    - TESTING -> **Test Data**
+    - BROWSER INTELLIGENCE -> **Browser Recorder**
+  - Automa / n8n Action Catalog: Currently has basic browser actions; lacks rich action panels for data operations (string/number/JSON/array) and extended browser actions (right click, hover, scroll).
+
+### 3.5 Deterministic Element Recognition & Self-Healing Engine (`backend/app/intelligence/`)
+- **Zero-AI Guarantee:** 100% deterministic rules. No LLM APIs, vector embeddings, or probabilistic hallucinations.
+- **Scoring Breakdown (6 Independent Evidence Categories):**
+  1. Semantic Role & Accessible Name: **30%** weight
+  2. Stable Attributes (`id`, `data-testid`, `name`): **25%** weight
+  3. Associated Label (`label[for]`, enclosing label): **15%** weight
+  4. Structural Fingerprint (ancestor hierarchy & siblings): **15%** weight
+  5. Historical Locator Success: **10%** weight
+  6. Visible Text (Levenshtein distance): **5%** weight (minor supporting evidence only)
+- **Threshold Gating:**
+  - Score $\ge 0.95$: Eligible for automatic self-healing execution (with uniqueness and safety checks).
+  - Score $0.85 - 0.94$: Routes to Human Approval Gate (`approvals` table).
+  - Score $< 0.85$: Immediate safe halt.
+  - Destructive Actions (delete, payment, submit): Elevated threshold ($0.98$) or mandatory approval.
+
+---
+
+## 4. Audit Summary & Readiness Scorecard
+
+| Area | Status | Score | Priority Action |
 | :--- | :--- | :--- | :--- |
-| **Browser Launch & Isolation** | Native multi-session daemon | `agent-browser --session <id> open <url>` | Each execution gets a unique UUID session (`--session <uuid>`), providing isolated cookies, cache, and state. |
-| **Navigation** | Open URL, back, forward, reload | `agent-browser --session <id> open <url>` | Safe subprocess execution with configurable timeout. |
-| **Interactive Snapshot** | Accessibility tree with refs | `agent-browser --session <id> snapshot -i --json` | Returns JSON accessibility tree with `@e1`, `@e2` element references, roles, and names. |
-| **DOM Inspection** | Element attributes, HTML, text | `agent-browser --session <id> get <text\|html\|attr\|box> <sel> --json` | Verified deterministic querying for text, attributes, bounding boxes, and computed styles. |
-| **State Verification** | Check visibility, enabled state | `agent-browser --session <id> is <visible\|enabled\|checked> <sel> --json` | Returns boolean status without mutating DOM or side effects. |
-| **Semantic Locators** | Find by role, text, label, testid | `agent-browser --session <id> find <role\|label\|testid> <val> <action>` | Direct support for deterministic semantic locator strategies (`--name`, `--exact`). |
-| **User Actions** | Click, double click, fill, type, select | `agent-browser --session <id> <click\|dblclick\|fill\|type\|select> <sel>` | Maps directly to verified CLI commands. |
-| **Waiting** | Explicit wait for selector or time | `agent-browser --session <id> wait <sel\|ms>` | Supports waiting for elements or milliseconds without guessing. |
-| **Screenshots** | Full page or standard screenshots | `agent-browser --session <id> screenshot <path> [--full]` | Writes PNG/JPEG directly to approved local path. |
-| **Deep DOM Extraction** | Arbitrary deterministic JS | `agent-browser --session <id> eval -b <base64_script> --json` | Base64-encoded JS script extraction avoids PowerShell escaping issues and extracts complete ancestor/sibling/ARIA trees. |
-| **Domain Restriction** | Built-in security policy | `AGENT_BROWSER_ALLOWED_DOMAINS=domain1,domain2` | CLI natively restricts navigation to approved domains, enforcing company security policies. |
-| **Browser Teardown** | Session closure | `agent-browser --session <id> close` | Explicit cleanup prevents orphaned daemon processes. |
-
-### Limitations & Safe Alternatives:
-- **No Direct CDP Socket Hijacking in Python**: `agent-browser` runs as a Node/Rust daemon. The Python adapter must communicate via clean, structured subprocess execution with explicit stdin/stdout/stderr handling and timeout protection rather than attempting direct unmanaged CDP socket manipulation.
-- **Ambiguous Element Recovery**: `agent-browser` fails when a ref matches multiple candidates. Our deterministic self-healing engine will evaluate the full DOM snapshot, rank candidates using multi-factor deterministic scoring, and generate a verified, unique selector before dispatching the action.
+| **Zero-AI Compliance** | Fully Compliant | 100% | Keep pure deterministic algorithms; no AI dependencies |
+| **Agent Browser Engine** | Fully Integrated | 90% | Add missing actions (`hover`, `scroll`, `right_click`, `back`, `forward`) |
+| **Database & Models** | Partially Implemented | 85% | Add `project_members`, dedicated test/flow tables, migrate startup to `lifespan` |
+| **Backend REST APIs** | Mostly Implemented | 88% | Add `/api/v1/recorder` router and template/test-data endpoints |
+| **Frontend Layout & Shell** | Mostly Implemented | 85% | Add Flow Templates, Test Data, and Browser Recorder to sidebar & router |
+| **Visual Flow Builder** | Implemented | 85% | Expand Action Catalog with Automa/n8n data and logic actions |
+| **Testing Engine** | Implemented | 90% | Implement interactive Browser Recorder & Test Data management |
+| **DOM & Self-Healing** | Fully Implemented | 95% | Expose direct simulation controls and candidate ranking inspector |
+| **Execution & Celery** | Implemented | 85% | Verify Celery worker task execution and Beat scheduling |
+| **RBAC & Security** | Fully Implemented | 95% | Add project-level member role enforcement |
 
 ---
 
-## 4. Analysis of Legacy Tests & Business Workflows
+## 5. Next Steps
 
-The master prompt references four core tests from the previous project iteration:
-1. `test_login.py`: Authentication flow (navigating to login page, entering email/password, submitting, asserting successful redirect and session token/cookie).
-2. `test_referral.py`: Referral creation workflow (navigating to referral dashboard, filling referee details, selecting program/tier, submitting form, verifying success notification and referral record).
-3. `test_fvr_status.py`: Financial Verification Review status workflow (checking verification table, inspecting status badges, verifying status changes from pending to approved/rejected).
-4. `test_dashboard.py`: Analytics and overview metrics verification (verifying metric cards, checking counts, validating table data and navigation links).
-
-### Migration Plan:
-- These workflows will be preserved and formalized into declarative, structured JSON test suites and flow definitions within the database.
-- A dedicated test migration utility (`backend/app/migration/legacy_importer.py`) will generate immutable database records for each test case and suite with deterministic step definitions, expected assertions, and element profiles.
-
----
-
-## 5. Security & Policy Violations Requiring Immediate Action
-
-1. **Purge Ollama & AI Config**:
-   - Immediate removal of `OLLAMA_ENDPOINT` and `OLLAMA_MODEL` from `.env` and `.env.example`.
-   - Update backend configuration schemas to disallow any external AI provider keys.
-2. **Credential Storage**:
-   - The `.env` file contains a plain-text Neon PostgreSQL connection string with password. Production environments must inject credentials via environment variables or secret managers.
-3. **Database Security**:
-   - Currently, user passwords use scrypt with a random salt, but tokens are generated using a custom HMAC string without standard expiration/claims enforcement. Migration to standard RFC-compliant JWTs (PyJWT) with HTTP-only cookies and proper role validation is required.
-
----
-
-## 6. Audit Conclusion & Recommendations
-
-The repository is in a prime state for structured enhancement:
-- Agent Browser CLI 0.41.2 is installed and fully functional.
-- Python 3.15 runtime is equipped with FastAPI, Pydantic, SQLAlchemy, RapidFuzz, and psycopg.
-- Node.js v26 and npm v11 are available.
-- Docker and Docker Compose v5.6.0 are available for local multi-container orchestration.
-
-**Recommended Next Step:** Review and approve this Audit and the accompanying `IMPLEMENTATION_PLAN.md` and `SECURITY_DESIGN.md` before initiating **Phase 1: Agent Browser Adapter**.
-
+1. Review and approve the accompanying:
+   - `docs/FEATURE_GAP_ANALYSIS.md`
+   - `docs/IMPLEMENTATION_ROADMAP.md`
+2. Begin Phase 1 upgrades according to the ordered implementation plan.

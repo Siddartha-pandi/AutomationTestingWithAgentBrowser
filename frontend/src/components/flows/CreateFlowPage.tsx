@@ -27,7 +27,7 @@ export function CreateFlowPage({ projectId, onNavigate, onFlowCreated }: CreateF
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [environment, setEnvironment] = useState("Staging");
-  const [tagsInput, setTagsInput] = useState("smoke, regression, onboarding");
+  const [tagsInput, setTagsInput] = useState("");
   const [loading, setLoading] = useState(false);
 
   const { success, error } = useToast();
@@ -42,44 +42,8 @@ export function CreateFlowPage({ projectId, onNavigate, onFlowCreated }: CreateF
     setLoading(true);
     try {
       const initialDefinition = {
-        nodes: [
-          {
-            id: "node_start",
-            type: "actionNode",
-            position: { x: 250, y: 50 },
-            data: {
-              action: "navigate",
-              summary: "Navigate to base application",
-              config: {
-                url: "https://example.com/login",
-                timeout: 30,
-              },
-            },
-          },
-          {
-            id: "node_click",
-            type: "actionNode",
-            position: { x: 250, y: 180 },
-            data: {
-              action: "click",
-              summary: "Click submit or primary action",
-              config: {
-                logical_id: "login_submit_btn",
-                recognition_strategy: "deterministic_multi_factor",
-                timeout: 15,
-                retry_policy: "exponential_backoff",
-              },
-            },
-          },
-        ],
-        edges: [
-          {
-            id: "edge_start_to_click",
-            source: "node_start",
-            target: "node_click",
-            animated: true,
-          },
-        ],
+        nodes: [],
+        edges: [],
       };
 
       const res = await flowsApi.create({

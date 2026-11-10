@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   CheckCircle2,
@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../common/ToastProvider";
 import { NavView } from "../layout/AppShell";
+import { intelligenceApi } from "@/api";
 
 interface ElementRecognitionPageProps {
   projectId: string;
@@ -44,108 +45,46 @@ interface CandidateMatch {
 }
 
 export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecognitionPageProps) {
-  const [selectedLogicalId, setSelectedLogicalId] = useState("referral_submit_btn");
+  const [elements, setElements] = useState<any[]>([]);
+  const [selectedLogicalId, setSelectedLogicalId] = useState("");
+  const [candidates, setCandidates] = useState<CandidateMatch[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const { success, info } = useToast();
+  useEffect(() => {
+    loadElements();
+  }, [projectId]);
 
-  const originalProfile = {
-    logical_id: "referral_submit_btn",
-    description: "Primary submit button on customer referral creation modal",
-    page_context: "Referral Dashboard",
-    element_type: "button",
-    original_text: "Send Referral Invitation",
-    expected_attributes: {
-      type: "submit",
-      "data-testid": "referral-submit-action",
-      role: "button",
-    },
-    structural_path: "body > div#app-root > main > div.modal-card > button.btn-primary",
+  const loadElements = async () => {
+    setLoading(true);
+    try {
+      const list = await intelligenceApi.listElements(projectId);
+      if (list && list.length > 0) {
+        setElements(list);
+        setSelectedLogicalId(list[0].logical_name || list[0].logical_id);
+      } else {
+        setElements([]);
+        setSelectedLogicalId("");
+      }
+    } catch {
+      setElements([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const candidates: CandidateMatch[] = [
-    {
-      rank: 1,
-      selector: "button[data-testid='referral-submit-action']",
-      tag: "button",
-      confidence_score: 98.4,
-      is_unique: true,
-      is_visible: true,
-      is_enabled: true,
-      decision: "Accepted",
-      decision_reason: "Matches data-testid with 100% attribute stability, verified single match in DOM, visible & enabled.",
-      evidence: {
-        matching_attributes: [
-          { attr: "data-testid='referral-submit-action'", score: 100 },
-          { attr: "type='submit'", score: 100 },
-        ],
-        semantic_evidence: [
-          { criterion: "ARIA role='button'", match: "Exact match", score: 100 },
-          { criterion: "Normalized Text Levenshtein", match: "'Send Referral' (92% text similarity)", score: 92 },
-        ],
-        structural_evidence: [
-          { criterion: "Jaccard Ancestor Similarity", score: 96 },
-          { criterion: "Sibling Position Offset", score: 100 },
-        ],
-        context_evidence: [
-          { criterion: "Parent Container Class .modal-card", score: 100 },
-          { criterion: "Page URL Match /referrals", score: 100 },
-        ],
-      },
-    },
-    {
-      rank: 2,
-      selector: "button.btn-secondary:has-text('Cancel')",
-      tag: "button",
-      confidence_score: 41.2,
-      is_unique: true,
-      is_visible: true,
-      is_enabled: true,
-      decision: "Rejected",
-      decision_reason: "Semantic text mismatch ('Cancel' vs 'Send Referral'). Insufficient confidence (< 85%).",
-      evidence: {
-        matching_attributes: [
-          { attr: "type='button'", score: 50 },
-        ],
-        semantic_evidence: [
-          { criterion: "ARIA role='button'", match: "Matches role", score: 100 },
-          { criterion: "Normalized Text Levenshtein", match: "'Cancel' (12% text similarity)", score: 12 },
-        ],
-        structural_evidence: [
-          { criterion: "Jaccard Ancestor Similarity", score: 85 },
-        ],
-        context_evidence: [
-          { criterion: "Parent Container Class", score: 100 },
-        ],
-      },
-    },
-    {
-      rank: 3,
-      selector: "a.nav-link:has-text('Referrals')",
-      tag: "a",
-      confidence_score: 28.5,
-      is_unique: false,
-      is_visible: true,
-      is_enabled: true,
-      decision: "Rejected",
-      decision_reason: "Non-unique match (3 duplicate links in header). Role mismatch ('link' instead of 'button').",
-      evidence: {
-        matching_attributes: [
-          { attr: "href='/referrals'", score: 30 },
-        ],
-        semantic_evidence: [
-          { criterion: "ARIA role='link'", match: "Role mismatch", score: 20 },
-        ],
-        structural_evidence: [
-          { criterion: "Jaccard Ancestor Similarity", score: 40 },
-        ],
-        context_evidence: [
-          { criterion: "Header Navigation Context", score: 15 },
-        ],
-      },
-    },
-  ];
+  const activeElement = elements.find((el) => (el.logical_name || el.logical_id) === selectedLogicalId) || elements[0] || null;
 
-  const selectedCandidate = candidates[0];
+  const originalProfile = activeElement ? {
+    logical_id: activeElement.logical_name || activeElement.logical_id || "element_target",
+    description: activeElement.description || "Profiled DOM element",
+    page_context: activeElement.page_context || "Default Context",
+    element_type: activeElement.element_type || "button",
+    original_text: activeElement.text || "Element",
+    expected_attributes: activeElement.stable_attributes || {},
+    structural_path: "body > main",
+  } : null;
+
+  const selectedCandidate = candidates[0] || null;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -169,34 +108,36 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
       </div>
 
       {/* Target Element Profile Summary Card */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Crosshair className="w-4 h-4 text-[#2563EB]" />
-            <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-              Active Element Profile: <strong className="font-mono text-[#2563EB]">{originalProfile.logical_id}</strong>
+      {originalProfile && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crosshair className="w-4 h-4 text-[#2563EB]" />
+              <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                Active Element Profile: <strong className="font-mono text-[#2563EB]">{originalProfile.logical_id}</strong>
+              </span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] font-mono">
+              {originalProfile.page_context}
             </span>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] font-mono">
-            {originalProfile.page_context}
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div>
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">Original Text</span>
-            <span className="font-medium text-slate-800 dark:text-slate-200">{originalProfile.original_text}</span>
-          </div>
-          <div>
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">Element Tag</span>
-            <span className="font-mono text-slate-800 dark:text-slate-200">&lt;{originalProfile.element_type}&gt;</span>
-          </div>
-          <div>
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">Target Attributes</span>
-            <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">data-testid, role</span>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Original Text</span>
+              <span className="font-medium text-slate-800 dark:text-slate-200">{originalProfile.original_text}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Element Tag</span>
+              <span className="font-mono text-slate-800 dark:text-slate-200">&lt;{originalProfile.element_type}&gt;</span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Target Attributes</span>
+              <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">data-testid, role</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Candidate Ranking & Scoring Evidence Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

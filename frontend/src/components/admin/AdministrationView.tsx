@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   ShieldAlert,
@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Lock,
 } from "lucide-react";
+import { adminApi } from "@/api";
 
 interface AdministrationViewProps {
   initialSubTab?: "users" | "roles" | "audit";
@@ -20,40 +21,55 @@ export function AdministrationView({ initialSubTab = "users" }: AdministrationVi
   const [activeTab, setActiveTab] = useState<"users" | "roles" | "audit">(initialSubTab);
 
   // Users State
-  const [users, setUsers] = useState([
-    {
-      id: "u-admin-1",
-      email: "admin@company.internal",
-      full_name: "Lead System Administrator",
-      role: "Owner",
-      status: "active",
-      last_login: "Just now",
-    },
-    {
-      id: "u-dev-1",
-      email: "dev.engineer@company.internal",
-      full_name: "Senior QA Automation Engineer",
-      role: "Developer",
-      status: "active",
-      last_login: "2 hours ago",
-    },
-    {
-      id: "u-test-1",
-      email: "tester@company.internal",
-      full_name: "Manual & Exploratory Tester",
-      role: "Tester",
-      status: "active",
-      last_login: "Yesterday",
-    },
-    {
-      id: "u-auditor-1",
-      email: "auditor@company.internal",
-      full_name: "Compliance Security Auditor",
-      role: "Viewer",
-      status: "active",
-      last_login: "3 days ago",
-    },
-  ]);
+  const [users, setUsers] = useState<any[]>([]);
+  // Audit Logs State
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [uList, aList] = await Promise.allSettled([
+        adminApi.listUsers(),
+        adminApi.listAuditLogs(),
+      ]);
+      if (uList.status === "fulfilled" && uList.value) {
+        setUsers(
+          uList.value.map((u: any) => ({
+            id: String(u.id),
+            email: u.email,
+            full_name: u.full_name || u.email.split("@")[0],
+            role: u.roles && u.roles[0]?.name
+              ? (u.roles[0].name.charAt(0).toUpperCase() + u.roles[0].name.slice(1))
+              : "Viewer",
+            status: u.is_active ? "active" : "inactive",
+            last_login: "Recent",
+          }))
+        );
+      }
+      if (aList.status === "fulfilled" && aList.value) {
+        setAuditLogs(
+          aList.value.map((a: any) => ({
+            id: String(a.id || `aud-${Math.random()}`),
+            timestamp: a.timestamp || a.created_at || "Recent",
+            user: a.user_email || a.user_id || "system",
+            action: (a.action || "AUDIT_EVENT").toUpperCase(),
+            resource: a.resource_type ? `${a.resource_type}:${a.resource_id || ""}` : a.resource || "system",
+            status: a.result?.toUpperCase() || "SUCCESS",
+            ip: a.client_ip || a.ip || "127.0.0.1",
+          }))
+        );
+      }
+    } catch {
+      // offline/no data
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Roles Matrix (Section 13 of Master Prompt)
   const roles = [
@@ -118,54 +134,7 @@ export function AdministrationView({ initialSubTab = "users" }: AdministrationVi
     },
   ];
 
-  // Audit Logs State
-  const auditLogs = [
-    {
-      id: "aud-001",
-      timestamp: "2026-11-10 12:35:10",
-      user: "admin@company.internal",
-      action: "EXECUTION_TRIGGERED",
-      resource: "flow:referral_flow_v1",
-      status: "SUCCESS",
-      ip: "127.0.0.1",
-    },
-    {
-      id: "aud-002",
-      timestamp: "2026-11-10 12:30:45",
-      user: "dev.engineer@company.internal",
-      action: "FLOW_VERSION_PUBLISHED",
-      resource: "flow:login_verification",
-      status: "SUCCESS",
-      ip: "127.0.0.1",
-    },
-    {
-      id: "aud-003",
-      timestamp: "2026-11-10 12:22:18",
-      user: "admin@company.internal",
-      action: "APPROVAL_RESPONDED",
-      resource: "approval:app-092-destructive-gate",
-      status: "APPROVED",
-      ip: "127.0.0.1",
-    },
-    {
-      id: "aud-004",
-      timestamp: "2026-11-10 12:15:02",
-      user: "system_worker",
-      action: "DETERMINISTIC_SELF_HEAL",
-      resource: "element:btn_submit_loan (score 0.96)",
-      status: "AUTO_HEALED",
-      ip: "internal",
-    },
-    {
-      id: "aud-005",
-      timestamp: "2026-11-10 11:58:30",
-      user: "auditor@company.internal",
-      action: "AUDIT_LOG_EXPORT",
-      resource: "security_audit_compliance",
-      status: "SUCCESS",
-      ip: "127.0.0.1",
-    },
-  ];
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

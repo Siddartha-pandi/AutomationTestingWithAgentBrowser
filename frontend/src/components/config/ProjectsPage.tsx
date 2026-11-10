@@ -65,6 +65,8 @@ export function ProjectsPage({ currentProject, onSelectProject, onNavigate }: Pr
             status: "active",
           }))
         );
+      } else {
+        setProjects([]);
       }
     } catch (err: any) {
       console.warn("Could not fetch projects:", err);
@@ -166,82 +168,104 @@ export function ProjectsPage({ currentProject, onSelectProject, onNavigate }: Pr
         </button>
       </div>
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filtered.map((proj) => {
-          const isActive = currentProject?.id === proj.id;
-          return (
-            <div
-              key={proj.id}
-              className={`p-5 rounded-2xl bg-white dark:bg-[#161F30] border shadow-2xs space-y-4 transition ${
-                isActive
-                  ? "border-[#2563EB] ring-2 ring-blue-500/10"
-                  : "border-slate-200 dark:border-slate-800"
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <span>{proj.name}</span>
-                    {isActive && (
-                      <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/60 text-[#2563EB] dark:text-blue-300 font-semibold font-mono">
-                        Active
-                      </span>
-                    )}
-                  </h3>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                    {proj.description}
+      {/* Projects Grid or Empty State */}
+      {filtered.length === 0 ? (
+        <div className="p-12 text-center rounded-2xl bg-white dark:bg-[#161F30] border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+          <Layers className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+          <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">No Projects Found</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            You don't have any projects in this workspace yet. Create your first project to begin building automated flows and test suites.
+          </p>
+          <button
+            onClick={() => {
+              setNameInput("");
+              setDescInput("");
+              setUrlInput("https://example.internal.company.net");
+              setModalOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create First Project</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filtered.map((proj) => {
+            const isActive = currentProject?.id === proj.id;
+            return (
+              <div
+                key={proj.id}
+                className={`p-5 rounded-2xl bg-white dark:bg-[#161F30] border shadow-2xs space-y-4 transition ${
+                  isActive
+                    ? "border-[#2563EB] ring-2 ring-blue-500/10"
+                    : "border-slate-200 dark:border-slate-800"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span>{proj.name}</span>
+                      {isActive && (
+                        <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-100 dark:bg-blue-900/60 text-[#2563EB] dark:text-blue-300 font-semibold font-mono">
+                          Active
+                        </span>
+                      )}
+                    </h3>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                      {proj.description}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize shrink-0 ${
+                      proj.status === "active"
+                        ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                    }`}
+                  >
+                    {proj.status}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-xs pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                  <div className="flex items-center gap-2 truncate">
+                    <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-mono text-[11px] truncate">{proj.base_url}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>Owner: {proj.owner}</span>
                   </div>
                 </div>
 
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize shrink-0 ${
-                    proj.status === "active"
-                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                  }`}
-                >
-                  {proj.status}
-                </span>
-              </div>
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                  {!isActive ? (
+                    <button
+                      onClick={() => handleSelectActive(proj)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold transition"
+                    >
+                      Select Workspace
+                    </button>
+                  ) : (
+                    <span className="text-emerald-600 font-semibold text-xs flex items-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Selected</span>
+                    </span>
+                  )}
 
-              <div className="space-y-1.5 text-xs pt-3 border-t border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                <div className="flex items-center gap-2 truncate">
-                  <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="font-mono text-[11px] truncate">{proj.base_url}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>Owner: {proj.owner}</span>
-                </div>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                {!isActive ? (
                   <button
-                    onClick={() => handleSelectActive(proj)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold transition"
+                    onClick={() => handleArchive(proj)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-semibold"
                   >
-                    Select Workspace
+                    {proj.status === "active" ? "Archive" : "Unarchive"}
                   </button>
-                ) : (
-                  <span className="text-emerald-600 font-semibold text-xs flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Selected</span>
-                  </span>
-                )}
-
-                <button
-                  onClick={() => handleArchive(proj)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-semibold"
-                >
-                  {proj.status === "active" ? "Archive" : "Unarchive"}
-                </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Create Project Modal */}
       {modalOpen && (

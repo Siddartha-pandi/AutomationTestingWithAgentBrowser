@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Users,
   Plus,
@@ -17,6 +17,7 @@ import {
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
 import { NavView } from "../layout/AppShell";
+import { adminApi } from "@/api";
 
 interface UsersManagementPageProps {
   onNavigate: (view: NavView) => void;
@@ -33,44 +34,40 @@ interface UserAccount {
 }
 
 export function UsersManagementPage({ onNavigate }: UsersManagementPageProps) {
-  const [users, setUsers] = useState<UserAccount[]>([
-    {
-      id: "u-1",
-      name: "Lead System Administrator",
-      email: "admin@company.internal",
-      role: "Owner",
-      status: "active",
-      last_login: "Just now",
-      created_at: "2026-11-01",
-    },
-    {
-      id: "u-2",
-      name: "Senior QA Automation Engineer",
-      email: "dev.engineer@company.internal",
-      role: "Developer",
-      status: "active",
-      last_login: "2 hours ago",
-      created_at: "2026-11-03",
-    },
-    {
-      id: "u-3",
-      name: "Exploratory & Sanity Tester",
-      email: "tester@company.internal",
-      role: "Tester",
-      status: "active",
-      last_login: "Yesterday",
-      created_at: "2026-11-05",
-    },
-    {
-      id: "u-4",
-      name: "Compliance Security Auditor",
-      email: "auditor@company.internal",
-      role: "Viewer",
-      status: "active",
-      last_login: "3 days ago",
-      created_at: "2026-11-07",
-    },
-  ]);
+  const [users, setUsers] = useState<UserAccount[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const list = await adminApi.listUsers();
+      if (list && list.length > 0) {
+        setUsers(
+          list.map((u: any) => ({
+            id: String(u.id),
+            name: u.full_name || u.email.split("@")[0],
+            email: u.email,
+            role: (u.roles && u.roles[0]?.name
+              ? (u.roles[0].name.charAt(0).toUpperCase() + u.roles[0].name.slice(1))
+              : "Viewer") as any,
+            status: u.is_active ? "active" : "inactive",
+            last_login: "Recent",
+            created_at: u.created_at ? u.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+          }))
+        );
+      } else {
+        setUsers([]);
+      }
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [modalOpen, setModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

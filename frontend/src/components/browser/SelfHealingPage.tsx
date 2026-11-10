@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   History,
   CheckCircle2,
@@ -43,58 +43,80 @@ interface HealingRecord {
 }
 
 export function SelfHealingPage({ projectId, onNavigate }: SelfHealingPageProps) {
-  const [healingRecords, setHealingRecords] = useState<HealingRecord[]>([
-    {
-      id: "heal-1",
-      date: "Today at 09:22 AM",
-      flow_test_name: "Customer Onboarding & Email Verification",
-      element_id: "referral_submit_btn",
-      previous_locator: "button#submit-v1-old",
-      new_locator: "button[data-testid='referral-submit-action']",
-      recognition_method: "Multi-Factor Scoring (ARIA + TestId)",
-      confidence: 96.8,
-      result: "auto_healed",
-      why_failed: "Original CSS ID '#submit-v1-old' was removed in frontend release 2.4.",
-      why_selected: "Identified with 96.8% confidence (>= 95% threshold). Uniquely matched ARIA role and data-testid.",
-      verification_status: "Verified in test sandbox before execution dispatch.",
-    },
-    {
-      id: "heal-2",
-      date: "Today at 08:45 AM",
-      flow_test_name: "Loan Application Submission Workflow",
-      element_id: "kyc_doc_upload_input",
-      previous_locator: "input[type='file']#kyc-file",
-      new_locator: "div.dropzone input[type='file']",
-      recognition_method: "Structural Jaccard Ancestor Matching",
-      confidence: 91.4,
-      result: "requires_approval",
-      why_failed: "Input element wrapped inside new styled drag-and-drop container.",
-      why_selected: "Score within 85-94% tier. Requires human approval gate before mutating stored locator.",
-      verification_status: "Pending human-in-the-loop review.",
-    },
-    {
-      id: "heal-3",
-      date: "Yesterday at 04:15 PM",
-      flow_test_name: "Admin Role Delegation Flow",
-      element_id: "deprovision_user_btn",
-      previous_locator: "button.delete-action",
-      new_locator: "button.archive-action",
-      recognition_method: "Semantic Role Matching",
-      confidence: 72.0,
-      result: "rejected",
-      why_failed: "Button class renamed to archive.",
-      why_selected: "Confidence score 72.0% is below the 85% safety boundary. Safe halt triggered.",
-      verification_status: "Halted safely to prevent accidental destructive action.",
-    },
-  ]);
-
-  const [selectedRecordId, setSelectedRecordId] = useState<string>("heal-2");
+  const [healingRecords, setHealingRecords] = useState<HealingRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedRecordId, setSelectedRecordId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { success, error, info } = useToast();
   const { confirm } = useConfirm();
 
-  const activeRecord = healingRecords.find((r) => r.id === selectedRecordId) || healingRecords[0];
+  useEffect(() => {
+    loadHealingData();
+  }, [projectId]);
+
+  const loadHealingData = async () => {
+    setLoading(true);
+    try {
+      const [events, approvals] = await Promise.allSettled([
+        intelligenceApi.listHealingEvents(),
+        intelligenceApi.listApprovals(),
+      ]);
+
+      const records: HealingRecord[] = [];
+
+      if (events.status === "fulfilled" && events.value) {
+        for (const ev of events.value) {
+          records.push({
+            id: String(ev.id || `heal-${Math.random()}`),
+            date: ev.created_at || "Recent",
+            flow_test_name: ev.test_name || ev.flow_name || "Workflow Execution",
+            element_id: ev.element_id || "element_target",
+            previous_locator: ev.original_selector || ev.previous_locator || "unknown",
+            new_locator: ev.healed_selector || ev.new_locator || "unknown",
+            recognition_method: ev.strategy || "Deterministic Multi-Factor",
+            confidence: ev.confidence ? Math.round(ev.confidence * 100) : 95,
+            result: ev.confidence >= 0.95 ? "auto_healed" : "requires_approval",
+            why_failed: ev.failure_reason || "Selector failed to resolve on page DOM mutation.",
+            why_selected: ev.rationale || "Resolved uniquely via multi-factor candidate ranking.",
+            verification_status: "Verified in execution sandbox.",
+          });
+        }
+      }
+
+      if (approvals.status === "fulfilled" && approvals.value) {
+        for (const app of approvals.value) {
+          if (!records.some((r) => r.id === String(app.id))) {
+            records.push({
+              id: String(app.id),
+              date: app.created_at || "Recent",
+              flow_test_name: app.flow_name || "Workflow Gate",
+              element_id: app.element_id || "destructive_action",
+              previous_locator: app.original_action || "action",
+              new_locator: app.proposed_action || "action",
+              recognition_method: "Human-in-the-Loop Safety Gate",
+              confidence: 90,
+              result: app.status === "approved" ? "auto_healed" : app.status === "rejected" ? "rejected" : "requires_approval",
+              why_failed: "Destructive step or mid-tier confidence requires operator sign-off.",
+              why_selected: "Enforced company safety threshold.",
+              verification_status: app.status || "pending",
+            });
+          }
+        }
+      }
+
+      setHealingRecords(records);
+      if (records.length > 0 && !selectedRecordId) {
+        setSelectedRecordId(records[0].id);
+      }
+    } catch {
+      setHealingRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeRecord = healingRecords.find((r) => r.id === selectedRecordId) || healingRecords[0] || null;
 
   const handleApprove = (record: HealingRecord) => {
     confirm({

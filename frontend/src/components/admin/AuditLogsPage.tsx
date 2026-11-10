@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ClipboardList,
   Search,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../common/ToastProvider";
 import { NavView } from "../layout/AppShell";
+import { adminApi } from "@/api";
 
 interface AuditLogsPageProps {
   onNavigate: (view: NavView) => void;
@@ -34,58 +35,39 @@ interface AuditRecord {
 }
 
 export function AuditLogsPage({ onNavigate }: AuditLogsPageProps) {
-  const [auditRecords, setAuditRecords] = useState<AuditRecord[]>([
-    {
-      id: "aud-001",
-      user: "admin@company.internal",
-      action: "production_execution_approved",
-      resource: "Environment: Production (app.company.internal)",
-      timestamp: "2026-11-10 09:14:02 IST",
-      ip_address: "10.0.4.12 (Internal VPN)",
-      result: "success",
-      details: "Secondary confirmation granted for execution 'exec-901a'.",
-    },
-    {
-      id: "aud-002",
-      user: "dev.engineer@company.internal",
-      action: "flow_published",
-      resource: "Flow: Customer Onboarding (v2.1)",
-      timestamp: "2026-11-10 08:30:15 IST",
-      ip_address: "10.0.4.19 (Internal VPN)",
-      result: "success",
-      details: "Created immutable definition version with SHA-256 integrity hash.",
-    },
-    {
-      id: "aud-003",
-      user: "tester@company.internal",
-      action: "unapproved_domain_blocked",
-      resource: "URL: https://external-leak-test.com",
-      timestamp: "2026-11-09 16:45:10 IST",
-      ip_address: "10.0.4.55 (Internal VPN)",
-      result: "blocked",
-      details: "Subprocess adapter rejected navigation outside approved whitelist.",
-    },
-    {
-      id: "aud-004",
-      user: "admin@company.internal",
-      action: "credential_created",
-      resource: "Credential: Staging Lead Administrator Account",
-      timestamp: "2026-11-09 11:20:00 IST",
-      ip_address: "10.0.4.12 (Internal VPN)",
-      result: "success",
-      details: "AES-256 encrypted secret stored in private database vault.",
-    },
-    {
-      id: "aud-005",
-      user: "auditor@company.internal",
-      action: "user_login",
-      resource: "Session: OAuth2 Password Token",
-      timestamp: "2026-11-07 14:10:00 IST",
-      ip_address: "10.0.2.80 (Compliance Subnet)",
-      result: "success",
-      details: "Read-only auditor session initialized.",
-    },
-  ]);
+  const [auditRecords, setAuditRecords] = useState<AuditRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, []);
+
+  const loadAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const logs = await adminApi.listAuditLogs(100);
+      if (logs && logs.length > 0) {
+        setAuditRecords(
+          logs.map((item: any) => ({
+            id: String(item.id || `aud-${Math.random()}`),
+            user: item.user_email || item.user_id || "system",
+            action: item.action || "action",
+            resource: item.resource_type ? `${item.resource_type}:${item.resource_id || ""}` : item.resource || "system",
+            timestamp: item.timestamp || item.created_at || "Recent",
+            ip_address: item.client_ip || item.ip || "127.0.0.1",
+            result: item.result === "blocked" ? "blocked" : item.result === "warning" ? "warning" : "success",
+            details: typeof item.details === "object" ? JSON.stringify(item.details) : String(item.details || "System event logged."),
+          }))
+        );
+      } else {
+        setAuditRecords([]);
+      }
+    } catch {
+      setAuditRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("all");

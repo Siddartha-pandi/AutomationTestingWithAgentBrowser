@@ -120,7 +120,15 @@ Services launched:
 
 ---
 
-## 🛡 Zero-AI Policy Compliance Auditor
+## 💻 Instant Team Onboarding (VS Code Dev Container)
+
+For teammates wanting a zero-config local development setup:
+1. Open the repository in VS Code or Cursor with Docker Desktop running.
+2. When prompted, click **"Reopen in Container"** (or press `F1` -> `Dev Containers: Reopen in Container`).
+3. The Dev Container automatically provisions Python 3.11, Node.js 20, the `agent-browser` engine, PostgreSQL 16, Redis 7, installs all dependencies, runs Alembic migrations, and seeds test data.
+4. See [.devcontainer/README.md](.devcontainer/README.md) for full usage instructions.
+
+---
 
 To run the automated compliance scanner verifying zero AI SDKs, zero LLM endpoints, and strict data protection:
 
