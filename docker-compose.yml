@@ -1,0 +1,128 @@
+version: "3.8"
+
+# ==============================================================================
+# AutomationTestingWithAgentBrowser - Multi-User SaaS Platform
+# Strict Zero-AI / No-LLM Company Data Protection Architecture
+# ==============================================================================
+
+services:
+  # 1. PostgreSQL Relational Database (19 enterprise tables)
+  postgres:
+    image: postgres:16-alpine
+    container_name: automation_testing_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-obscura}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d obscura"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Message Broker & State Store
+  redis:
+    image: redis:7-alpine
+    container_name: automation_testing_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. FastAPI REST Backend Server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: automation_testing_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-obscura}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-enterprise-production-jwt-secret-key-32chars}
+      AGENT_BROWSER_CLI: agent-browser
+      STORAGE_DIR: /app/reports
+      DEFAULT_TIMEZONE: Asia/Kolkata
+    ports:
+      - "8000:8000"
+    volumes:
+      - reports_storage:/app/reports
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # 4. Celery Background Worker (Asynchronous agent-browser subprocess isolation)
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: automation_testing_worker
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-obscura}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-enterprise-production-jwt-secret-key-32chars}
+      AGENT_BROWSER_CLI: agent-browser
+      STORAGE_DIR: /app/reports
+      DEFAULT_TIMEZONE: Asia/Kolkata
+    volumes:
+      - reports_storage:/app/reports
+    command: ["celery", "-A", "backend.app.worker.celery_app", "worker", "-l", "INFO", "-c", "4"]
+
+  # 5. Celery Beat Scheduler (Periodic cron evaluations & retention cleanup)
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: automation_testing_beat
+    restart: unless-stopped
+    depends_on:
+      celery_worker:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-obscura}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      STORAGE_DIR: /app/reports
+      DEFAULT_TIMEZONE: Asia/Kolkata
+    command: ["celery", "-A", "backend.app.worker.celery_app", "beat", "-l", "INFO"]
+
+  # 6. Next.js Enterprise SaaS Frontend UI
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: automation_testing_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  reports_storage:
+

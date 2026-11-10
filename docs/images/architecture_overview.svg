@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#090d16" />
+    </linearGradient>
+    <linearGradient id="blueCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#172554" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="purpleCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#581c87" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#3b0764" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="tealCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f766e" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#134e4a" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="amberCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b45309" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#78350f" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="emeraldCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#047857" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#064e3b" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="roseCard" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#be123c" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#881337" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrowEmerald" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Grid Lines -->
+  <g stroke="#334155" stroke-width="0.5" opacity="0.3">
+    <line x1="0" y1="100" x2="1200" y2="100"/>
+    <line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="0" y1="600" x2="1200" y2="600"/>
+    <line x1="0" y1="700" x2="1200" y2="700"/>
+    <line x1="150" y1="0" x2="150" y2="800"/>
+    <line x1="300" y1="0" x2="300" y2="800"/>
+    <line x1="450" y1="0" x2="450" y2="800"/>
+    <line x1="600" y1="0" x2="600" y2="800"/>
+    <line x1="750" y1="0" x2="750" y2="800"/>
+    <line x1="900" y1="0" x2="900" y2="800"/>
+    <line x1="1050" y1="0" x2="1050" y2="800"/>
+  </g>
+
+  <!-- Header -->
+  <rect x="40" y="25" width="1120" height="65" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="60" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#f8fafc">AutomationTestingWithAgentBrowser — Enterprise System Architecture</text>
+  <rect x="880" y="42" width="260" height="30" rx="15" fill="#065f46" stroke="#10b981" stroke-width="1"/>
+  <text x="900" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#a7f3d0">🛡 ZERO AI / NO-LLM GUARANTEE</text>
+
+  <!-- Layer 1: Next.js Frontend UI -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="115" width="1120" height="110" rx="10" fill="url(#blueCard)" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="65" y="145" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#93c5fd">1. PRESENTATION LAYER — NEXT.JS 16 ENTERPRISE UI (APP ROUTER)</text>
+    
+    <!-- UI Modules -->
+    <rect x="65" y="160" width="190" height="50" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="75" y="180" font-family="sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Visual Flow Builder</text>
+    <text x="75" y="198" font-family="sans-serif" font-size="10" fill="#94a3b8">@xyflow/react DAG Nodes</text>
+
+    <rect x="270" y="160" width="190" height="50" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="280" y="180" font-family="sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Visual Test Builder</text>
+    <text x="280" y="198" font-family="sans-serif" font-size="10" fill="#94a3b8">13 Deterministic Assertions</text>
+
+    <rect x="475" y="160" width="190" height="50" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="485" y="180" font-family="sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Live DOM Explorer</text>
+    <text x="485" y="198" font-family="sans-serif" font-size="10" fill="#94a3b8">Accessibility Tree &amp; Selectors</text>
+
+    <rect x="680" y="160" width="190" height="50" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="690" y="180" font-family="sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">Execution Observability</text>
+    <text x="690" y="198" font-family="sans-serif" font-size="10" fill="#94a3b8">Real-time Logs &amp; Screenshots</text>
+
+    <rect x="885" y="160" width="250" height="50" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+    <text x="895" y="180" font-family="sans-serif" font-size="12" font-weight="600" fill="#e2e8f0">RBAC &amp; Project Config</text>
+    <text x="895" y="198" font-family="sans-serif" font-size="10" fill="#94a3b8">Environments, Roles, Audit Logs</text>
+  </g>
+
+  <!-- Arrow Down to API -->
+  <line x1="600" y1="225" x2="600" y2="260" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <rect x="530" y="233" width="140" height="20" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+  <text x="540" y="247" font-family="sans-serif" font-size="10" font-weight="600" fill="#38bdf8">HTTPS / REST / JWT</text>
+
+  <!-- Layer 2: FastAPI Backend Core -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="265" width="1120" height="135" rx="10" fill="url(#purpleCard)" stroke="#c084fc" stroke-width="1.5"/>
+    <text x="65" y="293" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#e9d5ff">2. APPLICATION LAYER — FASTAPI ASYNC BACKEND CORE (PYTHON 3.11+)</text>
+    
+    <!-- API Components -->
+    <rect x="65" y="308" width="195" height="75" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="75" y="328" font-family="sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">API Routers (/api/v1/*)</text>
+    <text x="75" y="345" font-family="sans-serif" font-size="10" fill="#d8b4fe">/auth, /flows, /tests,</text>
+    <text x="75" y="360" font-family="sans-serif" font-size="10" fill="#d8b4fe">/executions, /healing, /dom</text>
+    <text x="75" y="375" font-family="sans-serif" font-size="10" fill="#a855f7">Pydantic v2 Validation</text>
+
+    <rect x="275" y="308" width="220" height="75" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="285" y="328" font-family="sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">Enterprise Security &amp; RBAC</text>
+    <text x="285" y="345" font-family="sans-serif" font-size="10" fill="#d8b4fe">JWT Bearer Token Extraction</text>
+    <text x="285" y="360" font-family="sans-serif" font-size="10" fill="#d8b4fe">AES-256-GCM Secret Cryptor</text>
+    <text x="285" y="375" font-family="sans-serif" font-size="10" fill="#a855f7">Deterministic Log Redaction</text>
+
+    <rect x="510" y="308" width="250" height="75" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="520" y="328" font-family="sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">Deterministic Self-Healing</text>
+    <text x="520" y="345" font-family="sans-serif" font-size="10" fill="#d8b4fe">Levenshtein + Jaccard Heuristics</text>
+    <text x="520" y="360" font-family="sans-serif" font-size="10" fill="#d8b4fe">Confidence Multi-Factor Engine</text>
+    <text x="520" y="375" font-family="sans-serif" font-size="10" fill="#34d399">≥95% Auto-Heal | 85-94% Review</text>
+
+    <rect x="775" y="308" width="180" height="75" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="785" y="328" font-family="sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">Flow &amp; Test Engine</text>
+    <text x="785" y="345" font-family="sans-serif" font-size="10" fill="#d8b4fe">DAG Graph Traversal</text>
+    <text x="785" y="360" font-family="sans-serif" font-size="10" fill="#d8b4fe">Circuit Breaker &amp; Retries</text>
+    <text x="785" y="375" font-family="sans-serif" font-size="10" fill="#a855f7">Deterministic Assertions</text>
+
+    <rect x="970" y="308" width="165" height="75" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="1"/>
+    <text x="980" y="328" font-family="sans-serif" font-size="12" font-weight="700" fill="#f3e8ff">Artifact &amp; Audit</text>
+    <text x="980" y="345" font-family="sans-serif" font-size="10" fill="#d8b4fe">SHA-256 Tamper Proofing</text>
+    <text x="980" y="360" font-family="sans-serif" font-size="10" fill="#d8b4fe">HAR Network Traces</text>
+    <text x="980" y="375" font-family="sans-serif" font-size="10" fill="#a855f7">HTML/PDF Report Gen</text>
+  </g>
+
+  <!-- Inter-layer Arrows -->
+  <line x1="220" y1="400" x2="220" y2="445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="600" y1="400" x2="600" y2="445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="980" y1="400" x2="980" y2="445" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 3: Persistence, Queue & Storage -->
+  <g filter="url(#shadow)">
+    <!-- PostgreSQL -->
+    <rect x="40" y="450" width="350" height="130" rx="10" fill="url(#tealCard)" stroke="#2dd4bf" stroke-width="1.5"/>
+    <text x="60" y="475" font-family="sans-serif" font-size="14" font-weight="700" fill="#99f6e4">POSTGRESQL 16 (19 ENTERPRISE TABLES)</text>
+    <text x="60" y="495" font-family="sans-serif" font-size="11" fill="#ccfbf1">• Users, Roles, Permissions (RBAC)</text>
+    <text x="60" y="512" font-family="sans-serif" font-size="11" fill="#ccfbf1">• Projects, Environments, Encrypted Credentials</text>
+    <text x="60" y="529" font-family="sans-serif" font-size="11" fill="#ccfbf1">• Automation Definitions &amp; Versions (JSONB)</text>
+    <text x="60" y="546" font-family="sans-serif" font-size="11" fill="#ccfbf1">• Executions, Steps, Logs &amp; Artifacts (UUID PKs)</text>
+    <text x="60" y="563" font-family="sans-serif" font-size="11" fill="#ccfbf1">• Element Profiles, Locator History, Healing Events</text>
+
+    <!-- Redis Queue -->
+    <rect x="420" y="450" width="360" height="130" rx="10" fill="url(#roseCard)" stroke="#fb7185" stroke-width="1.5"/>
+    <text x="440" y="475" font-family="sans-serif" font-size="14" font-weight="700" fill="#fecdd3">REDIS 7 BROKER &amp; RESULT BACKEND</text>
+    <text x="440" y="495" font-family="sans-serif" font-size="11" fill="#ffe4e6">• Task Message Queue (Celery Broker)</text>
+    <text x="440" y="512" font-family="sans-serif" font-size="11" fill="#ffe4e6">• Real-Time Execution State Storage</text>
+    <text x="440" y="529" font-family="sans-serif" font-size="11" fill="#ffe4e6">• Rate-Limiting &amp; Concurrent Execution Mutexes</text>
+    <text x="440" y="546" font-family="sans-serif" font-size="11" fill="#ffe4e6">• Celery Beat Scheduled Task Registers</text>
+    <text x="440" y="563" font-family="sans-serif" font-size="11" fill="#ffe4e6">• Pub/Sub Live Execution Updates</text>
+
+    <!-- Private Storage -->
+    <rect x="810" y="450" width="350" height="130" rx="10" fill="url(#amberCard)" stroke="#fbbf24" stroke-width="1.5"/>
+    <text x="830" y="475" font-family="sans-serif" font-size="14" font-weight="700" fill="#fef3c7">SECURE PRIVATE FILE STORAGE</text>
+    <text x="830" y="495" font-family="sans-serif" font-size="11" fill="#ffedd5">• reports/screenshots/ (PNG files)</text>
+    <text x="830" y="512" font-family="sans-serif" font-size="11" fill="#ffedd5">• reports/dom_snapshots/ (JSON Trees)</text>
+    <text x="830" y="529" font-family="sans-serif" font-size="11" fill="#ffedd5">• reports/artifacts/ (SHA-256 Traces &amp; Reports)</text>
+    <text x="830" y="546" font-family="sans-serif" font-size="11" fill="#ffedd5">• reports/healing_history/ (Diff Files)</text>
+    <text x="830" y="563" font-family="sans-serif" font-size="11" fill="#ffedd5">• Strict Permissions (chmod 0600, Zero AI Export)</text>
+  </g>
+
+  <!-- Arrow from Redis to Workers -->
+  <line x1="600" y1="580" x2="600" y2="620" stroke="#38bdf8" stroke-width="2.5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 4: Celery Workers & Agent Browser Execution -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="625" width="1120" height="145" rx="10" fill="url(#emeraldCard)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="65" y="652" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#a7f3d0">3. EXECUTION LAYER — DISTRIBUTED CELERY WORKERS &amp; AGENT BROWSER CLI</text>
+    
+    <!-- Celery Workers -->
+    <rect x="65" y="668" width="310" height="85" rx="6" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
+    <text x="80" y="690" font-family="sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">Celery 5.7 Execution Workers</text>
+    <text x="80" y="708" font-family="sans-serif" font-size="10" fill="#d1fae5">• DAG Step Dispatcher &amp; Execution Coordinator</text>
+    <text x="80" y="723" font-family="sans-serif" font-size="10" fill="#d1fae5">• Celery Beat Periodic Cron Scheduler</text>
+    <text x="80" y="738" font-family="sans-serif" font-size="10" fill="#d1fae5">• Timeout Guards, Heartbeats &amp; Auto-Retry</text>
+
+    <!-- Subprocess Bridge -->
+    <rect x="400" y="668" width="340" height="85" rx="6" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
+    <text x="415" y="690" font-family="sans-serif" font-size="12" font-weight="700" fill="#6ee7b7">Subprocess Adapter &amp; Isolation</text>
+    <text x="415" y="708" font-family="sans-serif" font-size="10" fill="#d1fae5">• Unique Session UUID per execution (--session &lt;uuid&gt;)</text>
+    <text x="415" y="723" font-family="sans-serif" font-size="10" fill="#d1fae5">• Strict Domain Whitelisting (SSRF Blocker)</text>
+    <text x="415" y="738" font-family="sans-serif" font-size="10" fill="#d1fae5">• In-Memory Secret Pipe Injection (No CLI argv leak)</text>
+
+    <!-- Agent Browser CLI -->
+    <rect x="765" y="668" width="370" height="85" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+    <text x="780" y="690" font-family="sans-serif" font-size="12" font-weight="700" fill="#34d399">Pure Agent-Browser CLI (v0.41.2)</text>
+    <text x="780" y="708" font-family="sans-serif" font-size="10" fill="#a7f3d0">• Headless Chromium Browser Automation Engine</text>
+    <text x="780" y="723" font-family="sans-serif" font-size="10" fill="#a7f3d0">• snapshot -i --json (Interactive Accessibility Tree)</text>
+    <text x="780" y="738" font-family="sans-serif" font-size="10" fill="#a7f3d0">• Native commands: open, click, fill, eval, screenshot</text>
+  </g>
+</svg>

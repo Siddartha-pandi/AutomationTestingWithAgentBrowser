@@ -1,0 +1,6 @@
+{
+    "python.terminal.useEnvFile": true,
+    "terminal.integrated.accessibleViewFocusOnCommandExecution": true,
+    "terminal.explorerKind": "both",
+    "terminal.integrated.accessibleViewPreserveCursorPosition": true
+}

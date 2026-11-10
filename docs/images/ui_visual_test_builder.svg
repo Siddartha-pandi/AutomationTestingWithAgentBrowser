@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="100%" height="100%">
+  <defs>
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="750" fill="#090d16"/>
+
+  <!-- Top Navigation Header -->
+  <rect width="1200" height="52" fill="#0f172a" stroke-bottom="#334155"/>
+  <line x1="0" y1="52" x2="1200" y2="52" stroke="#334155" stroke-width="1"/>
+  <text x="20" y="32" font-family="system-ui, sans-serif" font-size="16" font-weight="800" fill="#f8fafc">Visual Test Builder &amp; Assertion Suite</text>
+  
+  <rect x="730" y="12" width="130" height="30" rx="5" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+  <text x="745" y="31" font-family="sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">+ Add Assertion</text>
+
+  <rect x="870" y="12" width="120" height="30" rx="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1"/>
+  <text x="888" y="31" font-family="sans-serif" font-size="12" font-weight="600" fill="#60a5fa">Save Suite</text>
+
+  <rect x="1000" y="12" width="180" height="30" rx="5" fill="#2563eb"/>
+  <text x="1020" y="31" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff">▶ Execute Test Suite</text>
+
+  <!-- Left: Test Metadata & Suite Hierarchy -->
+  <g transform="translate(15, 65)">
+    <rect width="320" height="665" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect width="320" height="32" rx="8" fill="#0f172a"/>
+    <rect y="24" width="320" height="8" fill="#0f172a"/>
+    <text x="15" y="21" font-family="sans-serif" font-size="11" font-weight="700" fill="#93c5fd">TEST CASE CONFIGURATION</text>
+
+    <g transform="translate(15, 45)" font-family="sans-serif" font-size="11">
+      <text x="0" y="15" font-weight="700" fill="#cbd5e1">Test Case Title:</text>
+      <rect x="0" y="22" width="290" height="28" rx="4" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="41" font-weight="600" fill="#f8fafc">TC-401: Referral Submission Flow</text>
+
+      <text x="0" y="75" font-weight="700" fill="#cbd5e1">Parent Test Suite:</text>
+      <rect x="0" y="82" width="290" height="28" rx="4" fill="#0f172a"/>
+      <text x="10" y="101" fill="#94a3b8">Regression Suite — Core Workflows</text>
+
+      <text x="0" y="135" font-weight="700" fill="#cbd5e1">Environment &amp; Target Base URL:</text>
+      <rect x="0" y="142" width="290" height="28" rx="4" fill="#0f172a"/>
+      <text x="10" y="161" font-family="monospace" fill="#38bdf8">https://staging.internal.app</text>
+
+      <text x="0" y="195" font-weight="700" fill="#cbd5e1">Browser Execution Mode:</text>
+      <rect x="0" y="202" width="290" height="28" rx="4" fill="#0f172a"/>
+      <text x="10" y="221" fill="#a7f3d0">Headless Chromium (agent-browser)</text>
+
+      <text x="0" y="255" font-weight="700" fill="#cbd5e1">Allowed Domains (SSRF Whitelist):</text>
+      <rect x="0" y="262" width="290" height="28" rx="4" fill="#0f172a"/>
+      <text x="10" y="281" font-family="monospace" font-size="10" fill="#f8fafc">*.internal.app, auth.company.com</text>
+
+      <text x="0" y="315" font-weight="700" fill="#cbd5e1">Deterministic Assertions Library:</text>
+      
+      <!-- 13 Deterministic Assertions Pill Badges -->
+      <g transform="translate(0, 325)">
+        <rect x="0" y="0" width="88" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="6" y="14" font-family="monospace" font-size="9" fill="#93c5fd">url_equals</text>
+
+        <rect x="94" y="0" width="95" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="100" y="14" font-family="monospace" font-size="9" fill="#93c5fd">text_contains</text>
+
+        <rect x="195" y="0" width="95" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="201" y="14" font-family="monospace" font-size="9" fill="#93c5fd">element_visible</text>
+
+        <rect x="0" y="26" width="90" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="6" y="40" font-family="monospace" font-size="9" fill="#93c5fd">element_count</text>
+
+        <rect x="96" y="26" width="93" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="102" y="40" font-family="monospace" font-size="9" fill="#93c5fd">value_matches</text>
+
+        <rect x="195" y="26" width="95" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="201" y="40" font-family="monospace" font-size="9" fill="#93c5fd">status_code</text>
+
+        <rect x="0" y="52" width="90" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="6" y="66" font-family="monospace" font-size="9" fill="#93c5fd">title_equals</text>
+
+        <rect x="96" y="52" width="98" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="102" y="66" font-family="monospace" font-size="9" fill="#93c5fd">attribute_equals</text>
+
+        <rect x="200" y="52" width="90" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="206" y="66" font-family="monospace" font-size="9" fill="#93c5fd">is_enabled</text>
+
+        <rect x="0" y="78" width="90" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="6" y="92" font-family="monospace" font-size="9" fill="#93c5fd">is_checked</text>
+
+        <rect x="96" y="78" width="90" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="102" y="92" font-family="monospace" font-size="9" fill="#93c5fd">not_empty</text>
+
+        <rect x="192" y="78" width="98" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="198" y="92" font-family="monospace" font-size="9" fill="#93c5fd">regex_pattern</text>
+
+        <rect x="0" y="104" width="110" height="20" rx="3" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="6" y="118" font-family="monospace" font-size="9" fill="#93c5fd">latency_under_ms</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Right: Visual Step Sequence & Assertion Matrix -->
+  <g transform="translate(350, 65)">
+    <rect width="835" height="665" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" filter="url(#cardShadow)"/>
+    <rect width="835" height="32" rx="8" fill="#0f172a"/>
+    <rect y="24" width="835" height="8" fill="#0f172a"/>
+    <text x="15" y="21" font-family="sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">ORDERED TEST STEPS &amp; DETERMINISTIC ASSERTION PIPELINE</text>
+
+    <!-- Step 1 Card -->
+    <g transform="translate(15, 45)">
+      <rect width="805" height="95" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <rect x="12" y="12" width="24" height="24" rx="12" fill="#2563eb"/>
+      <text x="19" y="28" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff">1</text>
+      <text x="45" y="28" font-family="sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Navigate to Referral Submission Form</text>
+      <rect x="715" y="12" width="75" height="22" rx="4" fill="#065f46"/>
+      <text x="728" y="27" font-family="sans-serif" font-size="10" font-weight="700" fill="#a7f3d0">PASSED</text>
+      
+      <text x="45" y="52" font-family="sans-serif" font-size="11" fill="#94a3b8">Action: <tspan fill="#38bdf8">open("https://staging.internal.app/referrals/new")</tspan></text>
+      <!-- Assertion Row Inside Step -->
+      <rect x="45" y="60" width="745" height="25" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="76" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 1.1:</text>
+      <text x="160" y="76" font-family="monospace" font-size="10" fill="#cbd5e1">url_equals("https://staging.internal.app/referrals/new")</text>
+      <text x="680" y="76" font-family="sans-serif" font-size="10" fill="#94a3b8">Latency: 240ms</text>
+    </g>
+
+    <!-- Step 2 Card -->
+    <g transform="translate(15, 150)">
+      <rect width="805" height="115" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <rect x="12" y="12" width="24" height="24" rx="12" fill="#2563eb"/>
+      <text x="19" y="28" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff">2</text>
+      <text x="45" y="28" font-family="sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Fill Candidate Customer Information</text>
+      <rect x="715" y="12" width="75" height="22" rx="4" fill="#065f46"/>
+      <text x="728" y="27" font-family="sans-serif" font-size="10" font-weight="700" fill="#a7f3d0">PASSED</text>
+      
+      <text x="45" y="52" font-family="sans-serif" font-size="11" fill="#94a3b8">Inputs: <tspan fill="#cbd5e1">name="Acme Corp", email="sales@acme.com", tier="Enterprise"</tspan></text>
+      <!-- Assertions Inside Step -->
+      <rect x="45" y="60" width="745" height="22" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="75" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 2.1:</text>
+      <text x="160" y="75" font-family="monospace" font-size="10" fill="#cbd5e1">value_matches('input[name="client_name"]', "Acme Corp")</text>
+
+      <rect x="45" y="85" width="745" height="22" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="100" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 2.2:</text>
+      <text x="160" y="100" font-family="monospace" font-size="10" fill="#cbd5e1">is_enabled('button[type="submit"]') == True</text>
+    </g>
+
+    <!-- Step 3 Card -->
+    <g transform="translate(15, 275)">
+      <rect width="805" height="130" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <rect x="12" y="12" width="24" height="24" rx="12" fill="#2563eb"/>
+      <text x="19" y="28" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff">3</text>
+      <text x="45" y="28" font-family="sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Submit Referral &amp; Verify Confirmation Banner</text>
+      <rect x="715" y="12" width="75" height="22" rx="4" fill="#065f46"/>
+      <text x="728" y="27" font-family="sans-serif" font-size="10" font-weight="700" fill="#a7f3d0">PASSED</text>
+      
+      <text x="45" y="52" font-family="sans-serif" font-size="11" fill="#94a3b8">Action: <tspan fill="#38bdf8">click('button[type="submit"]')</tspan> • Post-Wait: <tspan fill="#38bdf8">selector('[data-testid="success-toast"]')</tspan></text>
+      
+      <rect x="45" y="60" width="745" height="22" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="75" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 3.1:</text>
+      <text x="160" y="75" font-family="monospace" font-size="10" fill="#cbd5e1">element_visible('[data-testid="success-toast"]') == True</text>
+
+      <rect x="45" y="85" width="745" height="22" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="100" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 3.2:</text>
+      <text x="160" y="100" font-family="monospace" font-size="10" fill="#cbd5e1">text_contains('[data-testid="success-toast"]', "Referral #REF-9021 created")</text>
+    </g>
+
+    <!-- Step 4 Card: FVR Verification -->
+    <g transform="translate(15, 415)">
+      <rect width="805" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+      <rect x="12" y="12" width="24" height="24" rx="12" fill="#2563eb"/>
+      <text x="19" y="28" font-family="sans-serif" font-size="12" font-weight="700" fill="#ffffff">4</text>
+      <text x="45" y="28" font-family="sans-serif" font-size="13" font-weight="700" fill="#f8fafc">Verify FVR (Field Verification Report) Status</text>
+      <rect x="715" y="12" width="75" height="22" rx="4" fill="#065f46"/>
+      <text x="728" y="27" font-family="sans-serif" font-size="10" font-weight="700" fill="#a7f3d0">PASSED</text>
+      
+      <text x="45" y="52" font-family="sans-serif" font-size="11" fill="#94a3b8">Action: Navigate to <tspan fill="#38bdf8">"/fvr/status?id=REF-9021"</tspan></text>
+      
+      <rect x="45" y="60" width="745" height="22" rx="4" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+      <text x="55" y="75" font-family="sans-serif" font-size="11" font-weight="600" fill="#34d399">✔ Assertion 4.1:</text>
+      <text x="160" y="75" font-family="monospace" font-size="10" fill="#cbd5e1">attribute_equals('.fvr-badge', 'data-status', 'PENDING_AUDIT')</text>
+    </g>
+
+    <!-- Bottom Execution Summary Pill -->
+    <g transform="translate(15, 540)">
+      <rect width="805" height="50" rx="6" fill="#064e3b" stroke="#059669" stroke-width="1"/>
+      <text x="20" y="30" font-family="sans-serif" font-size="13" font-weight="700" fill="#a7f3d0">SUITE RESULT: 4 of 4 Steps Passed (100% Deterministic Assertions Succeeded)</text>
+      <text x="620" y="30" font-family="sans-serif" font-size="11" fill="#6ee7b7">Total Runtime: 4.82s</text>
+    </g>
+  </g>
+</svg>

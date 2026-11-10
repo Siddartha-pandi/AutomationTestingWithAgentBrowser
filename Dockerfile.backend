@@ -1,0 +1,61 @@
+# Production Dockerfile for AutomationTestingWithAgentBrowser Backend
+# Includes Python 3.11, Node.js 20, and agent-browser CLI v0.41.2 engine.
+# Strictly Zero-AI / No-LLM Dependencies.
+
+FROM python:3.11-slim
+
+# Prevent Python from writing .pyc files and enable unbuffered logging
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    STORAGE_DIR=/app/reports
+
+WORKDIR /app
+
+# 1. Install system utilities and Linux browser libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    ca-certificates \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Install Node.js 20 LTS and agent-browser CLI 0.41.2
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g agent-browser@0.41.2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify agent-browser installation
+RUN agent-browser --version
+
+# 3. Install Python dependencies
+COPY backend/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/requirements.txt
+
+# 4. Copy backend application source and test suites
+COPY backend /app/backend
+COPY tests /app/tests
+COPY scripts /app/scripts
+COPY pytest.ini /app/pytest.ini
+
+# 5. Create storage directories with permissions
+RUN mkdir -p /app/reports/screenshots /app/reports/dom_snapshots /app/reports/artifacts /app/reports/exports
+
+EXPOSE 8000
+
+# Default command launches FastAPI via uvicorn
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

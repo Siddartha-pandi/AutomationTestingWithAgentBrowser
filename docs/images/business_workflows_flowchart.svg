@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="100%" height="100%">
+  <defs>
+    <filter id="bShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+    <marker id="bArrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="720" fill="#090d16"/>
+
+  <!-- Header -->
+  <rect x="40" y="25" width="1120" height="60" rx="10" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5" filter="url(#bShadow)"/>
+  <text x="70" y="60" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#f8fafc">The Four Core Business Workflows — Deterministic Test Suite</text>
+  <rect x="890" y="40" width="250" height="30" rx="15" fill="#065f46" stroke="#10b981" stroke-width="1"/>
+  <text x="910" y="60" font-family="sans-serif" font-size="11" font-weight="700" fill="#a7f3d0">END-TO-END VERIFICATION</text>
+
+  <!-- Flow 1: Authentication & Session Verification -->
+  <g transform="translate(40, 110)" filter="url(#bShadow)">
+    <rect width="260" height="560" rx="8" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5"/>
+    <rect width="260" height="34" rx="8" fill="#1e3a8a"/>
+    <rect y="26" width="260" height="8" fill="#1e3a8a"/>
+    <text x="15" y="23" font-family="sans-serif" font-size="12" font-weight="800" fill="#ffffff">WORKFLOW 1: AUTHENTICATION</text>
+
+    <g transform="translate(15, 50)" font-family="sans-serif" font-size="11">
+      <rect width="230" height="70" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="20" font-weight="700" fill="#60a5fa">Step 1: Open Login Page</text>
+      <text x="10" y="38" font-family="monospace" font-size="9" fill="#cbd5e1">open("/login")</text>
+      <text x="10" y="55" font-size="10" fill="#94a3b8">Assert: url_equals, title_equals</text>
+
+      <line x1="115" y1="70" x2="115" y2="90" stroke="#38bdf8" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="92" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="112" font-weight="700" fill="#60a5fa">Step 2: Input Credentials</text>
+      <text x="10" y="130" font-family="monospace" font-size="9" fill="#cbd5e1">fill('input[type="email"]')</text>
+      <text x="10" y="146" font-family="monospace" font-size="9" fill="#fbbf24">fill_secret(AUTH_PASS)</text>
+      <text x="10" y="164" font-size="10" fill="#34d399">In-memory secret redaction</text>
+
+      <line x1="115" y1="177" x2="115" y2="197" stroke="#38bdf8" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="200" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="220" font-weight="700" fill="#60a5fa">Step 3: Submit &amp; Redirect</text>
+      <text x="10" y="238" font-family="monospace" font-size="9" fill="#cbd5e1">click('button[type="submit"]')</text>
+      <text x="10" y="254" font-family="monospace" font-size="9" fill="#93c5fd">wait_for_url("/dashboard")</text>
+      <text x="10" y="272" font-size="10" fill="#a7f3d0">JWT cookie set (HttpOnly)</text>
+
+      <line x1="115" y1="285" x2="115" y2="305" stroke="#38bdf8" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="308" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="328" font-weight="700" fill="#60a5fa">Step 4: Verify Session</text>
+      <text x="10" y="346" font-family="monospace" font-size="9" fill="#cbd5e1">element_visible("#user-profile")</text>
+      <text x="10" y="362" font-family="monospace" font-size="9" fill="#cbd5e1">text_contains(".email", email)</text>
+      <text x="10" y="380" font-size="10" fill="#34d399">Session token verified</text>
+
+      <!-- Badge bottom -->
+      <rect y="440" width="230" height="45" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+      <text x="10" y="460" font-size="11" font-weight="700" fill="#a7f3d0">Test: test_login.py</text>
+      <text x="10" y="475" font-size="9" fill="#6ee7b7">Deterministic JWT Assertion Pass</text>
+    </g>
+  </g>
+
+  <!-- Flow 2: Referral Submission -->
+  <g transform="translate(325, 110)" filter="url(#bShadow)">
+    <rect width="260" height="560" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="1.5"/>
+    <rect width="260" height="34" rx="8" fill="#581c87"/>
+    <rect y="26" width="260" height="8" fill="#581c87"/>
+    <text x="15" y="23" font-family="sans-serif" font-size="12" font-weight="800" fill="#ffffff">WORKFLOW 2: REFERRAL FORM</text>
+
+    <g transform="translate(15, 50)" font-family="sans-serif" font-size="11">
+      <rect width="230" height="70" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="20" font-weight="700" fill="#c084fc">Step 1: Open Referral Form</text>
+      <text x="10" y="38" font-family="monospace" font-size="9" fill="#cbd5e1">open("/referrals/new")</text>
+      <text x="10" y="55" font-size="10" fill="#94a3b8">Assert: Form DOM tree loaded</text>
+
+      <line x1="115" y1="70" x2="115" y2="90" stroke="#a855f7" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="92" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="112" font-weight="700" fill="#c084fc">Step 2: Populate Form Data</text>
+      <text x="10" y="130" font-family="monospace" font-size="9" fill="#cbd5e1">fill('[name="client_name"]')</text>
+      <text x="10" y="146" font-family="monospace" font-size="9" fill="#cbd5e1">select('[name="tier"]', "Tier 1")</text>
+      <text x="10" y="164" font-size="10" fill="#94a3b8">Data-driven parameter loop</text>
+
+      <line x1="115" y1="177" x2="115" y2="197" stroke="#a855f7" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="200" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="220" font-weight="700" fill="#c084fc">Step 3: Click Submit</text>
+      <text x="10" y="238" font-family="monospace" font-size="9" fill="#cbd5e1">click('[data-testid="submit-ref"]')</text>
+      <text x="10" y="254" font-family="monospace" font-size="9" fill="#34d399">Self-Healing Armed (≥95%)</text>
+      <text x="10" y="272" font-size="10" fill="#94a3b8">HAR request recorded</text>
+
+      <line x1="115" y1="285" x2="115" y2="305" stroke="#a855f7" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="308" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="328" font-weight="700" fill="#c084fc">Step 4: Assert ID Created</text>
+      <text x="10" y="346" font-family="monospace" font-size="9" fill="#cbd5e1">regex_match('#ref-id', 'REF-\d+')</text>
+      <text x="10" y="362" font-family="monospace" font-size="9" fill="#cbd5e1">element_visible('.toast-success')</text>
+      <text x="10" y="380" font-size="10" fill="#34d399">Capture PNG artifact</text>
+
+      <rect y="440" width="230" height="45" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+      <text x="10" y="460" font-size="11" font-weight="700" fill="#a7f3d0">Test: test_referral.py</text>
+      <text x="10" y="475" font-size="9" fill="#6ee7b7">Regex &amp; DOM Verification Pass</text>
+    </g>
+  </g>
+
+  <!-- Flow 3: FVR Status Verification -->
+  <g transform="translate(610, 110)" filter="url(#bShadow)">
+    <rect width="260" height="560" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+    <rect width="260" height="34" rx="8" fill="#065f46"/>
+    <rect y="26" width="260" height="8" fill="#065f46"/>
+    <text x="15" y="23" font-family="sans-serif" font-size="12" font-weight="800" fill="#ffffff">WORKFLOW 3: FVR STATUS</text>
+
+    <g transform="translate(15, 50)" font-family="sans-serif" font-size="11">
+      <rect width="230" height="70" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="20" font-weight="700" fill="#34d399">Step 1: Open Status Tracker</text>
+      <text x="10" y="38" font-family="monospace" font-size="9" fill="#cbd5e1">open("/fvr/verification")</text>
+      <text x="10" y="55" font-size="10" fill="#94a3b8">Assert: Table headers visible</text>
+
+      <line x1="115" y1="70" x2="115" y2="90" stroke="#10b981" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="92" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="112" font-weight="700" fill="#34d399">Step 2: Query Referral ID</text>
+      <text x="10" y="130" font-family="monospace" font-size="9" fill="#cbd5e1">fill('#search-input', ref_id)</text>
+      <text x="10" y="146" font-family="monospace" font-size="9" fill="#cbd5e1">click('#btn-search')</text>
+      <text x="10" y="164" font-size="10" fill="#94a3b8">Wait: networkidle (500ms)</text>
+
+      <line x1="115" y1="177" x2="115" y2="197" stroke="#10b981" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="200" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="220" font-weight="700" fill="#34d399">Step 3: Assert Badge State</text>
+      <text x="10" y="238" font-family="monospace" font-size="9" fill="#cbd5e1">attribute_equals('.badge',</text>
+      <text x="10" y="254" font-family="monospace" font-size="9" fill="#cbd5e1">  'data-state', 'VERIFIED')</text>
+      <text x="10" y="272" font-size="10" fill="#a7f3d0">State transition check</text>
+
+      <line x1="115" y1="285" x2="115" y2="305" stroke="#10b981" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="308" width="230" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="328" font-weight="700" fill="#34d399">Step 4: Field Audit Match</text>
+      <text x="10" y="346" font-family="monospace" font-size="9" fill="#cbd5e1">text_contains('.officer', name)</text>
+      <text x="10" y="362" font-family="monospace" font-size="9" fill="#cbd5e1">is_checked('#audit-completed')</text>
+      <text x="10" y="380" font-size="10" fill="#34d399">Check boolean toggle</text>
+
+      <rect y="440" width="230" height="45" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+      <text x="10" y="460" font-size="11" font-weight="700" fill="#a7f3d0">Test: test_fvr_status.py</text>
+      <text x="10" y="475" font-size="9" fill="#6ee7b7">State Lifecycle Assertion Pass</text>
+    </g>
+  </g>
+
+  <!-- Flow 4: Dashboard Analytics Extraction -->
+  <g transform="translate(895, 110)" filter="url(#bShadow)">
+    <rect width="265" height="560" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+    <rect width="265" height="34" rx="8" fill="#78350f"/>
+    <rect y="26" width="265" height="8" fill="#78350f"/>
+    <text x="15" y="23" font-family="sans-serif" font-size="12" font-weight="800" fill="#ffffff">WORKFLOW 4: ANALYTICS</text>
+
+    <g transform="translate(15, 50)" font-family="sans-serif" font-size="11">
+      <rect width="235" height="70" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="20" font-weight="700" fill="#fbbf24">Step 1: Open Metrics View</text>
+      <text x="10" y="38" font-family="monospace" font-size="9" fill="#cbd5e1">open("/analytics/overview")</text>
+      <text x="10" y="55" font-size="10" fill="#94a3b8">Assert: Recharts canvas rendered</text>
+
+      <line x1="117" y1="70" x2="117" y2="90" stroke="#f59e0b" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="92" width="235" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="112" font-weight="700" fill="#fbbf24">Step 2: Scrape Table Metrics</text>
+      <text x="10" y="130" font-family="monospace" font-size="9" fill="#cbd5e1">extract_table('#metrics-tbl')</text>
+      <text x="10" y="146" font-family="monospace" font-size="9" fill="#cbd5e1">element_count('tr.row', &gt;= 5)</text>
+      <text x="10" y="164" font-size="10" fill="#94a3b8">Structured JSON extraction</text>
+
+      <line x1="117" y1="177" x2="117" y2="197" stroke="#f59e0b" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="200" width="235" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="220" font-weight="700" fill="#fbbf24">Step 3: Check Numerical KPIs</text>
+      <text x="10" y="238" font-family="monospace" font-size="9" fill="#cbd5e1">latency_under_ms(1500)</text>
+      <text x="10" y="254" font-family="monospace" font-size="9" fill="#cbd5e1">value_greater_than('#rev', 0)</text>
+      <text x="10" y="272" font-size="10" fill="#a7f3d0">SLA performance verified</text>
+
+      <line x1="117" y1="285" x2="117" y2="305" stroke="#f59e0b" stroke-width="2" marker-end="url(#bArrow)"/>
+
+      <rect y="308" width="235" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+      <text x="10" y="328" font-weight="700" fill="#fbbf24">Step 4: Export Audit Package</text>
+      <text x="10" y="346" font-family="monospace" font-size="9" fill="#cbd5e1">export_report(format="PDF")</text>
+      <text x="10" y="362" font-family="monospace" font-size="9" fill="#cbd5e1">verify_sha256_hash()</text>
+      <text x="10" y="380" font-size="10" fill="#34d399">SHA-256 seal verified</text>
+
+      <rect y="440" width="235" height="45" rx="4" fill="#064e3b" stroke="#10b981" stroke-width="1"/>
+      <text x="10" y="460" font-size="11" font-weight="700" fill="#a7f3d0">Test: test_dashboard.py</text>
+      <text x="10" y="475" font-size="9" fill="#6ee7b7">Data Extraction &amp; Hash Pass</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,6 @@
+# AutomationTestingWithAgentBrowser Robots Configuration
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+
