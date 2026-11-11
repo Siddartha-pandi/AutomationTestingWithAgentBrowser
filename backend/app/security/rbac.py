@@ -108,6 +108,12 @@ def require_permission(*required_permissions: str) -> Callable[[User], User]:
                 return current_user
             if req == "flows:execute" and "executions:trigger" in permissions:
                 return current_user
+            if req in ("environments:read", "environments:write") and ("environments:write" in permissions or "create" in permissions):
+                return current_user
+            if req in ("credentials:manage", "credentials:read", "manage_credentials") and ("credentials:manage" in permissions or "manage_credentials" in permissions):
+                return current_user
+            if req in ("audit:read", "audit_logs:read") and ("audit_logs:read" in permissions or "audit:read" in permissions):
+                return current_user
 
         logger.warning(
             "Access denied: User %s lacks permission '%s'. User permissions: %s",

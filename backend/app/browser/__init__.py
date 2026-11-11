@@ -4,7 +4,7 @@ Provides a deterministic, safe, subprocess-based Python adapter for Agent Browse
 Zero AI processing, strict timeout handling, session isolation, and state verification.
 """
 
-from .agent_browser import AgentBrowserAdapter
+from .agent_browser import ActionResult, AgentBrowserAdapter
 from .browser_errors import (
     AgentBrowserError,
     BrowserCommandError,
@@ -21,6 +21,7 @@ from .screenshot_manager import ScreenshotManager, ScreenshotResult
 from .session_manager import BrowserSession, SessionManager
 
 __all__ = [
+    "ActionResult",
     "AgentBrowserAdapter",
     "AgentBrowserError",
     "BrowserCommandError",

@@ -61,6 +61,7 @@ class AgentBrowserAdapter:
         default_timeout: float = 30.0,
         base_storage_dir: str = "./reports",
         allowed_domains: list[str] | None = None,
+        **kwargs: Any,
     ) -> None:
         self.executor = CommandExecutor(
             cli_path=cli_path,
@@ -88,6 +89,7 @@ class AgentBrowserAdapter:
         project_id: str | None = None,
         execution_id: str | None = None,
         allowed_domains: list[str] | None = None,
+        user_id: str | None = None,
     ) -> BrowserSession:
         """Initializes a new isolated browser session."""
         session = self.session_manager.create_session(
@@ -95,6 +97,7 @@ class AgentBrowserAdapter:
             project_id=project_id,
             execution_id=execution_id,
             allowed_domains=allowed_domains,
+            user_id=user_id,
         )
         logger.info("Launched isolated session: %s", session.session_id)
         return session
@@ -120,38 +123,39 @@ class AgentBrowserAdapter:
         session_id: str,
         url: str,
         timeout: float = 30.0,
+        wait_until: str | None = None,
+        timeout_ms: int | None = None,
     ) -> ActionResult:
         """Navigates to the specified URL after verifying security policy and domain allowlist."""
-        # Security: validate URL structure and allowed domains
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https"):
-            raise NavigationSecurityError(url, "Only http and https schemes are permitted.")
+        if timeout_ms is not None:
+            timeout = timeout_ms / 1000.0
+
+        from backend.app.security.network_policy import validate_destination_url
 
         session = self.session_manager.get_session(session_id)
-        active_domains = session.allowed_domains if session else self.executor.allowed_domains
-        if active_domains:
-            hostname = parsed.hostname or ""
-            allowed = False
-            for pattern in active_domains:
-                pattern = pattern.strip().lower()
-                if pattern in ("*", "*.*", "all"):
-                    allowed = True
-                    break
-                if pattern.startswith("*."):
-                    base = pattern[2:]
-                    if hostname == base or hostname.endswith(f".{base}"):
-                        allowed = True
-                        break
-                elif hostname == pattern:
-                    allowed = True
-                    break
-            if not allowed:
-                raise NavigationSecurityError(
-                    url,
-                    f"Domain '{hostname}' is not in approved allowed domains list: {active_domains}",
-                )
+        active_domains = session.allowed_domains if session and session.allowed_domains else self.executor.allowed_domains
+
+        is_valid, reason = validate_destination_url(url, allowed_domains=active_domains if active_domains else None)
+        if not is_valid:
+            raise NavigationSecurityError(url, reason)
 
         res = self.executor.execute(["open", url], session_id=session_id, timeout=timeout)
+
+        # Validate post-navigation destination for redirect SSRF
+        try:
+            current_url = self.get_url(session_id)
+            if current_url and (current_url.startswith("http://") or current_url.startswith("https://")):
+                redirect_valid, redirect_reason = validate_destination_url(
+                    current_url, allowed_domains=active_domains if active_domains else None
+                )
+                if not redirect_valid:
+                    self.close(session_id)
+                    raise NavigationSecurityError(current_url, f"Redirect destination blocked: {redirect_reason}")
+        except NavigationSecurityError:
+            raise
+        except Exception:
+            pass
+
         return ActionResult(
             success=res.is_success,
             action="navigate",
@@ -422,6 +426,107 @@ class AgentBrowserAdapter:
             output=res.stdout.strip(),
         )
 
+    def scroll_into_view(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Scrolls the element into view."""
+        res = self.executor.execute(["scrollintoview", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="scroll_into_view",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def press_key(self, session_id: str, key: str, timeout: float = 15.0) -> ActionResult:
+        """Presses a single key or key combination (e.g. Enter, Tab, Escape, Control+a)."""
+        res = self.executor.execute(["press", key], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="press",
+            target=key,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def keyboard_type(self, session_id: str, text: str, timeout: float = 15.0) -> ActionResult:
+        """Types text with real keyboard events at the currently focused element."""
+        res = self.executor.execute(["keyboard", "type", text], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="keyboard_type",
+            target="keyboard",
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def focus(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Directly focuses an element."""
+        res = self.executor.execute(["focus", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="focus",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def clear(self, session_id: str, selector: str, timeout: float = 15.0) -> ActionResult:
+        """Clears an input or textarea element."""
+        res = self.executor.execute(["fill", selector, ""], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="clear",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def drag_and_drop(
+        self,
+        session_id: str,
+        source_selector: str,
+        target_selector: str,
+        timeout: float = 15.0,
+    ) -> ActionResult:
+        """Drags the source element and drops it onto the target element."""
+        res = self.executor.execute(["drag", source_selector, target_selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="drag_and_drop",
+            target=f"{source_selector} -> {target_selector}",
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def upload(
+        self,
+        session_id: str,
+        selector: str,
+        file_paths: list[str],
+        timeout: float = 15.0,
+    ) -> ActionResult:
+        """Sets files on a file input element."""
+        args = ["upload", selector, *file_paths]
+        res = self.executor.execute(args, session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="upload",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
+    def highlight(self, session_id: str, selector: str, timeout: float = 10.0) -> ActionResult:
+        """Highlights the target element with a visible border outline."""
+        res = self.executor.execute(["highlight", selector], session_id=session_id, timeout=timeout)
+        return ActionResult(
+            success=res.is_success,
+            action="highlight",
+            target=selector,
+            duration_ms=res.duration_ms,
+            output=res.stdout.strip(),
+        )
+
     def back(self, session_id: str, timeout: float = 15.0) -> ActionResult:
         """Navigates back in browser history."""
         res = self.executor.execute(["back"], session_id=session_id, timeout=timeout)
@@ -464,9 +569,17 @@ class AgentBrowserAdapter:
         res = self.executor.execute(["get", "text", selector], session_id=session_id, timeout=timeout)
         return res.stdout.strip()
 
-    def get_attribute(self, session_id: str, selector: str, attr_name: str, timeout: float = 10.0) -> str | None:
+    def get_attribute(
+        self,
+        session_id: str,
+        selector: str,
+        attr_name: str | None = None,
+        attribute_name: str | None = None,
+        timeout: float = 10.0,
+    ) -> str | None:
         """Retrieves a specific attribute value of an element."""
-        res = self.executor.execute(["get", "attr", selector, attr_name], session_id=session_id, timeout=timeout)
+        target_attr = attr_name or attribute_name or "value"
+        res = self.executor.execute(["get", "attr", selector, target_attr], session_id=session_id, timeout=timeout)
         val = res.stdout.strip()
         return None if val in ("null", "undefined", "") else val
 
@@ -497,6 +610,28 @@ class AgentBrowserAdapter:
             return int(res.stdout.strip())
         except ValueError:
             return 0
+
+    def get_box(self, session_id: str, selector: str, timeout: float = 10.0) -> dict[str, float] | None:
+        """Retrieves bounding box coordinates (x, y, width, height) of an element."""
+        res = self.executor.execute(["get", "box", selector], session_id=session_id, timeout=timeout, parse_json=True)
+        if isinstance(res.json_data, dict):
+            return res.json_data
+        try:
+            return json.loads(res.stdout) if res.stdout.strip() else None
+        except Exception:
+            return None
+
+    def get_console_logs(self, session_id: str, clear: bool = False, timeout: float = 10.0) -> list[str]:
+        """Retrieves accumulated console log messages."""
+        args = ["console", "--clear"] if clear else ["console"]
+        res = self.executor.execute(args, session_id=session_id, timeout=timeout)
+        return [line for line in res.stdout.splitlines() if line.strip()]
+
+    def get_page_errors(self, session_id: str, clear: bool = False, timeout: float = 10.0) -> list[str]:
+        """Retrieves uncaught page errors."""
+        args = ["errors", "--clear"] if clear else ["errors"]
+        res = self.executor.execute(args, session_id=session_id, timeout=timeout)
+        return [line for line in res.stdout.splitlines() if line.strip()]
 
     # -------------------------------------------------------------------------
     # State Verifications (True / False)
@@ -545,6 +680,10 @@ class AgentBrowserAdapter:
         except Exception:
             return False
 
+    def wait_for_selector(self, session_id: str, selector: str, timeout_ms: int = 10000) -> bool:
+        """Waits for an element matching selector to appear in DOM."""
+        return self.wait_for(session_id, target=selector, timeout_ms=timeout_ms)
+
     # -------------------------------------------------------------------------
     # Screenshots
     # -------------------------------------------------------------------------
@@ -570,9 +709,16 @@ class AgentBrowserAdapter:
     # JavaScript Evaluation
     # -------------------------------------------------------------------------
 
-    def evaluate(self, session_id: str, js_code: str, timeout: float = 15.0) -> Any:
+    def evaluate(
+        self,
+        session_id: str,
+        js_code: str | None = None,
+        expression: str | None = None,
+        timeout: float = 15.0,
+    ) -> Any:
         """Executes JavaScript deterministically using base64 encoding to prevent shell escaping."""
-        encoded = base64.b64encode(js_code.encode("utf-8")).decode("utf-8")
+        code = js_code or expression or ""
+        encoded = base64.b64encode(code.encode("utf-8")).decode("utf-8")
         res = self.executor.execute(["eval", "-b", encoded], session_id=session_id, timeout=timeout, parse_json=True)
         if isinstance(res.json_data, dict) and "data" in res.json_data and "result" in res.json_data["data"]:
             return res.json_data["data"]["result"]

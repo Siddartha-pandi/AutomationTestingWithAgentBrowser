@@ -39,6 +39,14 @@ class Settings:
     agent_browser_timeout: float = float(os.getenv("AGENT_BROWSER_TIMEOUT", "30.0"))
     storage_dir: str = os.getenv("STORAGE_DIR", "./reports")
     default_timezone: str = os.getenv("DEFAULT_TIMEZONE", "Asia/Kolkata")
+    allowed_domains: tuple[str, ...] = tuple(
+        value.strip()
+        for value in os.getenv(
+            "ALLOWED_DOMAINS",
+            "localhost,127.0.0.1,*.company.internal,*.company.local",
+        ).split(",")
+        if value.strip()
+    )
 
     # Worker & Redis Execution
     celery_broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")

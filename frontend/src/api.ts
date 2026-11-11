@@ -90,6 +90,8 @@ export const flowsApi = {
   update: (id: string, data: { name?: string; description?: string; definition?: any; flow_graph?: any }) =>
     request<any>(`/api/v1/flows/${id}`, { method: "PUT", body: { ...data, definition: data.definition || data.flow_graph } }),
   publish: (id: string) => request<any>(`/api/v1/flows/${id}/publish`, { method: "POST" }),
+  validate: (definition: any) =>
+    request<any>("/api/v1/flows/validate", { method: "POST", body: { definition } }),
   execute: (id: string, data?: { version_id?: string; initial_variables?: Record<string, any> }) =>
     request<any>(`/api/v1/flows/${id}/execute`, { method: "POST", body: data || {} }),
 };
@@ -137,6 +139,20 @@ export const executionsApi = {
   },
   get: (id: string) => request<any>(`/api/v1/executions/${id}`),
   cancel: (id: string) => request<any>(`/api/v1/executions/${id}/cancel`, { method: "POST" }),
+  getReport: (id: string) => request<any>(`/api/v1/executions/${id}/report`),
+  getLogs: (id: string, filters?: { level?: string; search?: string; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.level) params.append("level", filters.level);
+    if (filters?.search) params.append("search", filters.search);
+    if (filters?.limit) params.append("limit", String(filters.limit));
+    if (filters?.offset) params.append("offset", String(filters.offset));
+    const qs = params.toString();
+    return request<any>(`/api/v1/executions/${id}/logs${qs ? `?${qs}` : ""}`);
+  },
+  getHtmlReportUrl: (id: string) => `${API_BASE_URL}/api/v1/executions/${id}/report/html`,
+  getLogsDownloadUrl: (id: string, format: "txt" | "json" = "txt", level?: string) =>
+    `${API_BASE_URL}/api/v1/executions/${id}/logs/download?format=${format}${level ? `&level=${level}` : ""}`,
+  getViewportUrl: (id: string) => `${API_BASE_URL}/api/v1/executions/${id}/viewport`,
 };
 
 // 5. DOM & Intelligence
@@ -177,15 +193,25 @@ export const projectsApi = {
 export const environmentsApi = {
   list: (projectId?: string) =>
     request<any[]>(`/api/v1/environments${projectId ? `?project_id=${projectId}` : ""}`),
-  create: (data: { project_id: string; name: string; base_url: string; allowed_domains?: string[] }) =>
+  get: (id: string) =>
+    request<any>(`/api/v1/environments/${id}`),
+  create: (data: { project_id: string; name: string; base_url: string; allowed_domains?: string[]; variables?: Record<string, string> }) =>
     request<any>("/api/v1/environments", { method: "POST", body: data }),
+  update: (id: string, data: { name?: string; base_url?: string; allowed_domains?: string[]; variables?: Record<string, string> }) =>
+    request<any>(`/api/v1/environments/${id}`, { method: "PUT", body: data }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/environments/${id}`, { method: "DELETE" }),
 };
 
 export const credentialsApi = {
   list: (projectId?: string) =>
     request<any[]>(`/api/v1/credentials${projectId ? `?project_id=${projectId}` : ""}`),
+  get: (id: string) =>
+    request<any>(`/api/v1/credentials/${id}`),
   create: (data: { project_id: string; name: string; credential_type: string; username?: string; secret_value: string; domain_scope?: string }) =>
     request<any>("/api/v1/credentials", { method: "POST", body: data }),
+  update: (id: string, data: { name?: string; credential_type?: string; username?: string; secret_value?: string; domain_scope?: string }) =>
+    request<any>(`/api/v1/credentials/${id}`, { method: "PUT", body: data }),
   delete: (id: string) =>
     request<void>(`/api/v1/credentials/${id}`, { method: "DELETE" }),
 };
@@ -204,6 +230,10 @@ export const browserApi = {
     request<any>("/api/v1/browser/screenshot", { method: "POST", body: { session_id: sessionId, ...data } }),
   getViewport: (sessionId: string) =>
     request<any>(`/api/v1/browser/viewport/${sessionId}`),
+  validateSelector: (selector: string) =>
+    request<any>("/api/v1/browser/validate-selector", { method: "POST", body: { selector } }),
+  testSelector: (data: { session_id: string; selector: string; fallbacks?: string[]; highlight?: boolean; timeout?: number }) =>
+    request<any>("/api/v1/browser/test-selector", { method: "POST", body: data }),
   close: (sessionId: string) =>
     request<any>("/api/v1/browser/close", { method: "POST", body: { session_id: sessionId } }),
 };
@@ -244,5 +274,22 @@ export const reportsApi = {
 export const adminApi = {
   listUsers: () => request<any[]>("/api/v1/users"),
   listRoles: () => request<any[]>("/api/v1/roles"),
-  listAuditLogs: (limit = 100) => request<any[]>(`/api/v1/audit?limit=${limit}`),
+  listAuditLogs: (filters?: { limit?: number; action?: string; resource_type?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.limit) params.append("limit", String(filters.limit));
+    if (filters?.action) params.append("action", filters.action);
+    if (filters?.resource_type) params.append("resource_type", filters.resource_type);
+    const qs = params.toString();
+    return request<any[]>(`/api/v1/audit${qs ? `?${qs}` : ""}`);
+  },
+  exportAuditLogsUrl: (format: "csv" | "json" = "csv") =>
+    `${API_BASE_URL}/api/v1/audit/export?format=${format}`,
+  purgeRetention: (data?: { log_days?: number; screenshot_days?: number; dom_days?: number }) => {
+    const params = new URLSearchParams();
+    if (data?.log_days) params.append("log_days", String(data.log_days));
+    if (data?.screenshot_days) params.append("screenshot_days", String(data.screenshot_days));
+    if (data?.dom_days) params.append("dom_days", String(data.dom_days));
+    const qs = params.toString();
+    return request<any>(`/api/v1/audit/retention/purge${qs ? `?${qs}` : ""}`, { method: "POST" });
+  },
 };

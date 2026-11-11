@@ -17,6 +17,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from backend.app.browser import AgentBrowserAdapter, SessionManager
+from backend.app.engine.events import execution_event_bus, ExecutionEventTypes
 from backend.app.engine.flows.action_registry import ActionRegistry, StepExecutionResult
 from backend.app.engine.flows.variable_scope import VariableScope
 from backend.app.engine.testing.assertion_engine import AssertionEngine, AssertionResult
@@ -39,12 +40,12 @@ class TestRunner:
     def __init__(
         self,
         adapter: AgentBrowserAdapter,
-        session_manager: SessionManager,
-        db: Session,
+        session_manager: SessionManager | None = None,
+        db: Session | None = None,
         redactor: Redactor | None = None,
     ) -> None:
         self.adapter = adapter
-        self.session_manager = session_manager
+        self.session_manager = session_manager or getattr(adapter, "session_manager", None) or SessionManager()
         self.db = db
         self.redactor = redactor or Redactor()
         self.action_registry = ActionRegistry(adapter, db=db)
@@ -55,25 +56,51 @@ class TestRunner:
         execution_id: UUID,
         test_case: TestCaseDefinition,
         test_data_row: dict[str, Any] | None = None,
+        session_id: str | None = None,
+        manage_session: bool = True,
     ) -> dict[str, Any]:
         """Executes a single test case through setup, action/assertion steps, and teardown."""
         execution = self.db.query(Execution).filter(Execution.id == execution_id).first()
         if not execution:
             raise TestRunnerError(f"Execution record {execution_id} not found in database")
 
-        execution.status = "running"
-        execution.started_at = datetime.now(timezone.utc)
-        self.db.commit()
+        if execution.status == "cancelled":
+            logger.info("Execution %s is already cancelled. Aborting.", execution_id)
+            return {
+                "execution_id": str(execution_id),
+                "status": "cancelled",
+                "duration_ms": 0.0,
+                "summary": execution.summary,
+            }
+
+        if manage_session:
+            execution.status = "running"
+            execution.started_at = datetime.now(timezone.utc)
+            self.db.commit()
 
         # Initialize variable scope with test data
         merged_vars = dict(test_data_row or {})
         scope = VariableScope(initial_vars=merged_vars)
 
-        # Allocate dedicated Agent Browser session
-        session_context = self.session_manager.create_session()
-        session_id = getattr(session_context, "session_id", str(session_context))
-        execution.session_id = session_id
-        self.db.commit()
+        # Allocate dedicated Agent Browser session if not already provided
+        owns_session = False
+        if not session_id:
+            if execution.session_id:
+                session_id = execution.session_id
+            else:
+                session_context = self.session_manager.create_session(
+                    execution_id=str(execution_id),
+                    project_id=str(execution.project_id) if execution.project_id else None,
+                    user_id=str(execution.triggered_by) if execution.triggered_by else None,
+                )
+                session_id = getattr(session_context, "session_id", str(session_context))
+                execution.session_id = session_id
+                self.db.commit()
+                owns_session = True
+        else:
+            if execution.session_id != session_id:
+                execution.session_id = session_id
+                self.db.commit()
 
         start_time_mono = time.monotonic()
         step_index: int = 1
@@ -88,6 +115,11 @@ class TestRunner:
             execution_id,
             test_case.name,
             session_id,
+        )
+        execution_event_bus.publish(
+            execution_id,
+            ExecutionEventTypes.STATUS_CHANGE,
+            {"status": "running", "test_name": test_case.name, "session_id": session_id},
         )
 
         try:
@@ -139,30 +171,41 @@ class TestRunner:
                 except Exception as td_err:
                     logger.warning("Teardown step '%s' encountered error: %s", step.name, td_err)
 
-            # Cleanup browser session
-            try:
-                self.session_manager.close_session(session_id)
-            except Exception as close_err:
-                logger.warning("Error closing test session %s: %s", session_id, close_err)
+            # Cleanup browser session if managed locally
+            if manage_session and owns_session and session_id:
+                try:
+                    self.session_manager.close_session(session_id)
+                except Exception as close_err:
+                    logger.warning("Error closing test session %s: %s", session_id, close_err)
 
             total_duration_ms = (time.monotonic() - start_time_mono) * 1000.0
 
-            # Commit final execution report to PostgreSQL
-            self.db.refresh(execution)
-            if execution.status != "cancelled":
-                execution.status = overall_status
-            execution.completed_at = datetime.now(timezone.utc)
-            execution.duration_ms = round(total_duration_ms, 2)
-            execution.summary = {
-                "outcome": execution.status,
-                "total_steps": len(step_metrics),
-                "passed_steps": sum(1 for s in step_metrics if s["status"] == "passed"),
-                "failed_steps": sum(1 for s in step_metrics if s["status"] == "failed"),
-                "assertions_total": assertions_total,
-                "assertions_passed": assertions_passed,
-                "assertions_failed": assertions_failed,
-            }
-            self.db.commit()
+            # Commit final execution report to PostgreSQL if running standalone test case
+            if manage_session:
+                self.db.refresh(execution)
+                if execution.status != "cancelled":
+                    execution.status = overall_status
+                execution.completed_at = datetime.now(timezone.utc)
+                execution.duration_ms = round(total_duration_ms, 2)
+                execution.summary = {
+                    "outcome": execution.status,
+                    "total_steps": len(step_metrics),
+                    "passed_steps": sum(1 for s in step_metrics if s["status"] == "passed"),
+                    "failed_steps": sum(1 for s in step_metrics if s["status"] == "failed"),
+                    "assertions_total": assertions_total,
+                    "assertions_passed": assertions_passed,
+                    "assertions_failed": assertions_failed,
+                }
+                self.db.commit()
+                execution_event_bus.publish(
+                    execution_id,
+                    ExecutionEventTypes.STATUS_CHANGE,
+                    {
+                        "status": execution.status,
+                        "duration_ms": execution.duration_ms,
+                        "summary": execution.summary,
+                    },
+                )
 
         logger.info(
             "Test case %s completed in %.2f ms with outcome '%s' (Assertions: %d/%d passed)",
@@ -212,6 +255,8 @@ class TestRunner:
             action_cfg = dict(step.config)
             if target_selector:
                 action_cfg["target"] = {"selector": target_selector}
+            if getattr(step, "retries", 0) > 0 and "retries" not in action_cfg:
+                action_cfg["retries"] = step.retries
             step_res = self.action_registry.execute_action(
                 action=step.action,
                 session_id=session_id,
@@ -298,6 +343,51 @@ class TestRunner:
         )
         self.db.add(exec_log)
         self.db.commit()
+
+        # Stream live execution events
+        if screenshot_file:
+            execution_event_bus.publish(
+                execution_id,
+                ExecutionEventTypes.SCREENSHOT_CAPTURED,
+                {"step_index": step_index, "screenshot_path": screenshot_file},
+            )
+
+        if status_code == "passed":
+            execution_event_bus.publish(
+                execution_id,
+                ExecutionEventTypes.STEP_COMPLETE,
+                {
+                    "step_index": step_index,
+                    "node_id": step.id,
+                    "status": "passed",
+                    "duration_ms": duration_ms,
+                    "result_data": redacted_result,
+                },
+            )
+        else:
+            execution_event_bus.publish(
+                execution_id,
+                ExecutionEventTypes.STEP_FAILED,
+                {
+                    "step_index": step_index,
+                    "node_id": step.id,
+                    "status": status_code,
+                    "duration_ms": duration_ms,
+                    "error_message": error_msg,
+                    "screenshot_path": screenshot_file,
+                },
+            )
+
+        execution_event_bus.publish(
+            execution_id,
+            ExecutionEventTypes.CONSOLE_LOG,
+            {
+                "level": "ERROR" if status_code == "failed" else "INFO",
+                "message": log_text,
+                "step_index": step_index,
+                "node_id": step.id,
+            },
+        )
 
         return {
             "step_id": step.id,

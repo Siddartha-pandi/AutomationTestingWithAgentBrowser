@@ -28,11 +28,23 @@ class FlowActionType(str, Enum):
     CHECK = "check"
     UNCHECK = "uncheck"
     SCROLL = "scroll"
+    SCROLL_INTO_VIEW = "scroll_into_view"
+    PRESS_KEY = "press_key"
+    KEYBOARD_TYPE = "keyboard_type"
+    FOCUS = "focus"
+    CLEAR = "clear"
+    DRAG_AND_DROP = "drag_and_drop"
+    UPLOAD_FILE = "upload_file"
+    EVALUATE_JS = "evaluate_js"
     EXTRACT_TEXT = "extract_text"
     EXTRACT_ATTRIBUTE = "extract_attribute"
     EXTRACT_TABLE = "extract_table"
     WAIT = "wait"
     WAIT_UNTIL = "wait_until"
+    WAIT_FOR_ELEMENT = "wait_for_element"
+    WAIT_FOR_URL = "wait_for_url"
+    WAIT_FOR_TEXT = "wait_for_text"
+    WAIT_FOR_NETWORK_IDLE = "wait_for_network_idle"
     BROWSER_BACK = "browser_back"
     BROWSER_FORWARD = "browser_forward"
     REFRESH = "refresh"
@@ -65,6 +77,7 @@ class ElementTarget(BaseModel):
     logical_id: str | None = None
     selector: str | None = None
     element_profile_id: UUID | None = None
+    fallbacks: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_target_provided(self) -> ElementTarget:
@@ -77,7 +90,7 @@ class FlowNode(BaseModel):
     """Visual workflow canvas node (React Flow compatible)."""
 
     id: str = Field(min_length=1, max_length=64)
-    type: str = Field(default="action", pattern="^(action|condition|loop|trigger|stop)$")
+    type: str = Field(default="action", pattern="^(action|condition|loop|trigger|branch|stop)$")
     action: FlowActionType | None = None
     config: dict[str, Any] = Field(default_factory=dict)
     position: dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})

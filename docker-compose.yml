@@ -20,7 +20,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d automation_platform_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-automation_platform_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -55,13 +55,23 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-enterprise-production-jwt-secret-key-32chars}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-${CREDENTIALS_MASTER_KEY:-enterprise-master-encryption-key-32chars}}
       AGENT_BROWSER_CLI: agent-browser
+      AGENT_BROWSER_EXECUTABLE_PATH: /usr/bin/chromium
+      AGENT_BROWSER_ARGS: "--no-sandbox --disable-dev-shm-usage --disable-gpu"
       STORAGE_DIR: /app/reports
-      DEFAULT_TIMEZONE: Asia/Kolkata
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      ZERO_AI_POLICY_ENFORCED: "true"
     ports:
       - "8000:8000"
     volumes:
       - reports_storage:/app/reports
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
   # 4. Celery Background Worker (Asynchronous agent-browser subprocess isolation)
@@ -73,7 +83,7 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
@@ -81,9 +91,13 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-enterprise-production-jwt-secret-key-32chars}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-${CREDENTIALS_MASTER_KEY:-enterprise-master-encryption-key-32chars}}
       AGENT_BROWSER_CLI: agent-browser
+      AGENT_BROWSER_EXECUTABLE_PATH: /usr/bin/chromium
+      AGENT_BROWSER_ARGS: "--no-sandbox --disable-dev-shm-usage --disable-gpu"
       STORAGE_DIR: /app/reports
-      DEFAULT_TIMEZONE: Asia/Kolkata
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      ZERO_AI_POLICY_ENFORCED: "true"
     volumes:
       - reports_storage:/app/reports
     command: ["celery", "-A", "backend.app.worker.celery_app", "worker", "-l", "INFO", "-c", "4"]
@@ -105,7 +119,10 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       STORAGE_DIR: /app/reports
-      DEFAULT_TIMEZONE: Asia/Kolkata
+      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
+      ZERO_AI_POLICY_ENFORCED: "true"
+    volumes:
+      - reports_storage:/app/reports
     command: ["celery", "-A", "backend.app.worker.celery_app", "beat", "-l", "INFO"]
 
   # 6. Next.js Enterprise SaaS Frontend UI
@@ -116,7 +133,8 @@ services:
     container_name: automation_testing_frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
@@ -125,4 +143,3 @@ services:
 volumes:
   postgres_data:
   reports_storage:
-

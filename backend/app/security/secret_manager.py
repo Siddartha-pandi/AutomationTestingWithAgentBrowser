@@ -13,7 +13,11 @@ from backend.config import settings
 
 def _get_encryption_key() -> bytes:
     """Derives a deterministic 256-bit encryption key from application configuration."""
-    raw_key = os.getenv("APP_ENCRYPTION_KEY") or settings.jwt_secret
+    raw_key = (
+        os.getenv("APP_ENCRYPTION_KEY")
+        or os.getenv("CREDENTIALS_MASTER_KEY")
+        or settings.jwt_secret
+    )
     return hashlib.sha256(raw_key.encode("utf-8")).digest()
 
 

@@ -14,7 +14,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
-from backend.app.models.execution import Artifact
+from backend.app.models.execution import Artifact, Execution
+from backend.app.api.v1.projects import user_has_project_access
 from backend.app.reports.artifact_manager import ArtifactManager, ArtifactSecurityError
 from backend.app.security.audit import log_audit_event
 from backend.app.security.rbac import require_permission
@@ -47,6 +48,11 @@ def get_artifact_metadata(
     artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
     if not artifact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+
+    execution = db.query(Execution).filter(Execution.id == artifact.execution_id).first()
+    if not execution or not user_has_project_access(db, execution.project_id, current_user):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+
     return ArtifactResponse.model_validate(artifact)
 
 
@@ -60,6 +66,10 @@ def download_artifact(
     """Securely downloads an artifact binary with SHA-256 header and path traversal protection."""
     artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
     if not artifact:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+
+    execution = db.query(Execution).filter(Execution.id == artifact.execution_id).first()
+    if not execution or not user_has_project_access(db, execution.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
 
     try:
@@ -97,6 +107,10 @@ def view_artifact(
     """Streams artifact inline for browser display (e.g., screenshots or DOM inspection)."""
     artifact = db.query(Artifact).filter(Artifact.id == artifact_id).first()
     if not artifact:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+
+    execution = db.query(Execution).filter(Execution.id == artifact.execution_id).first()
+    if not execution or not user_has_project_access(db, execution.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
 
     try:

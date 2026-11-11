@@ -39,13 +39,18 @@ def execute_flow_task(
     """Celery background worker task for executing a visual flow graph."""
     execution_id = UUID(execution_id_str)
     db = SessionLocal()
-    session_manager = SessionManager()
+    adapter = AgentBrowserAdapter()
+    session_manager = adapter.session_manager
     session_id: str | None = None
     try:
         execution = db.query(Execution).filter(Execution.id == execution_id).first()
         if not execution:
             logger.error("Execution record %s not found in database", execution_id)
             return {"status": "error", "message": f"Execution {execution_id} not found"}
+
+        if execution.status == "cancelled":
+            logger.info("Execution %s already cancelled prior to worker execution", execution_id)
+            return {"status": "cancelled", "execution_id": str(execution_id)}
 
         version = (
             db.query(DefinitionVersion)
@@ -58,10 +63,14 @@ def execute_flow_task(
         flow_graph = FlowGraphDefinition.model_validate(version.definition_json)
 
         # Create isolated browser session
-        session_id = session_manager.create_session(
-            user_id=str(execution.triggered_by or "system_worker")
+        session = session_manager.create_session(
+            execution_id=str(execution_id),
+            project_id=str(execution.project_id) if execution.project_id else None,
+            user_id=str(execution.triggered_by or "system_worker"),
         )
-        adapter = AgentBrowserAdapter(session_id=session_id)
+        session_id = session.session_id
+        execution.session_id = session_id
+        db.commit()
 
         executor = FlowExecutor(
             adapter=adapter,
@@ -74,13 +83,14 @@ def execute_flow_task(
             execution_id=execution_id,
             flow_graph=flow_graph,
             initial_variables=initial_variables,
+            session_id=session_id,
         )
         return result
     except Exception as err:
         logger.exception("Failed executing flow task for execution %s: %s", execution_id, err)
         try:
             exec_rec = db.query(Execution).filter(Execution.id == execution_id).first()
-            if exec_rec and exec_rec.status not in ("completed", "failed"):
+            if exec_rec and exec_rec.status not in ("completed", "passed", "failed", "cancelled"):
                 exec_rec.status = "failed"
                 exec_rec.completed_at = datetime.now(timezone.utc)
                 exec_rec.summary = {"error": str(err), "success": False}
@@ -92,8 +102,8 @@ def execute_flow_task(
         if session_id:
             try:
                 session_manager.close_session(session_id)
-            except Exception:
-                pass
+            except Exception as close_err:
+                logger.warning("Error closing session %s: %s", session_id, close_err)
         db.close()
 
 
@@ -106,13 +116,18 @@ def execute_test_case_task(
     """Celery background worker task for executing a deterministic test case."""
     execution_id = UUID(execution_id_str)
     db = SessionLocal()
-    session_manager = SessionManager()
+    adapter = AgentBrowserAdapter()
+    session_manager = adapter.session_manager
     session_id: str | None = None
     try:
         execution = db.query(Execution).filter(Execution.id == execution_id).first()
         if not execution:
             logger.error("Execution record %s not found in database", execution_id)
             return {"status": "error", "message": f"Execution {execution_id} not found"}
+
+        if execution.status == "cancelled":
+            logger.info("Execution %s already cancelled prior to test worker execution", execution_id)
+            return {"status": "cancelled", "execution_id": str(execution_id)}
 
         version = (
             db.query(DefinitionVersion)
@@ -124,10 +139,14 @@ def execute_test_case_task(
 
         test_case = TestCaseDefinition.model_validate(version.definition_json)
 
-        session_id = session_manager.create_session(
-            user_id=str(execution.triggered_by or "system_worker")
+        session = session_manager.create_session(
+            execution_id=str(execution_id),
+            project_id=str(execution.project_id) if execution.project_id else None,
+            user_id=str(execution.triggered_by or "system_worker"),
         )
-        adapter = AgentBrowserAdapter(session_id=session_id)
+        session_id = session.session_id
+        execution.session_id = session_id
+        db.commit()
 
         runner = TestRunner(
             adapter=adapter,
@@ -140,13 +159,14 @@ def execute_test_case_task(
             execution_id=execution_id,
             test_case=test_case,
             test_data_row=test_data_row,
+            session_id=session_id,
         )
         return result
     except Exception as err:
         logger.exception("Failed executing test case task for execution %s: %s", execution_id, err)
         try:
             exec_rec = db.query(Execution).filter(Execution.id == execution_id).first()
-            if exec_rec and exec_rec.status not in ("completed", "passed", "failed"):
+            if exec_rec and exec_rec.status not in ("completed", "passed", "failed", "cancelled"):
                 exec_rec.status = "failed"
                 exec_rec.completed_at = datetime.now(timezone.utc)
                 exec_rec.summary = {"error": str(err), "success": False}
@@ -158,8 +178,8 @@ def execute_test_case_task(
         if session_id:
             try:
                 session_manager.close_session(session_id)
-            except Exception:
-                pass
+            except Exception as close_err:
+                logger.warning("Error closing session %s: %s", session_id, close_err)
         db.close()
 
 
@@ -171,13 +191,18 @@ def execute_test_suite_task(
     """Celery background worker task for executing a regression test suite."""
     execution_id = UUID(execution_id_str)
     db = SessionLocal()
-    session_manager = SessionManager()
+    adapter = AgentBrowserAdapter()
+    session_manager = adapter.session_manager
     session_id: str | None = None
     try:
         execution = db.query(Execution).filter(Execution.id == execution_id).first()
         if not execution:
             logger.error("Execution record %s not found in database", execution_id)
             return {"status": "error", "message": f"Execution {execution_id} not found"}
+
+        if execution.status == "cancelled":
+            logger.info("Execution %s already cancelled prior to suite worker execution", execution_id)
+            return {"status": "cancelled", "execution_id": str(execution_id)}
 
         version = (
             db.query(DefinitionVersion)
@@ -189,14 +214,16 @@ def execute_test_suite_task(
 
         test_suite = TestSuiteDefinition.model_validate(version.definition_json)
 
+        session = session_manager.create_session(
+            execution_id=str(execution_id),
+            project_id=str(execution.project_id) if execution.project_id else None,
+            user_id=str(execution.triggered_by or "system_worker"),
+        )
+        session_id = session.session_id
+        execution.session_id = session_id
         execution.status = "running"
         execution.started_at = datetime.now(timezone.utc)
         db.commit()
-
-        session_id = session_manager.create_session(
-            user_id=str(execution.triggered_by or "system_worker")
-        )
-        adapter = AgentBrowserAdapter(session_id=session_id)
 
         runner = TestRunner(
             adapter=adapter,
@@ -209,6 +236,12 @@ def execute_test_suite_task(
         overall_passed = True
 
         for tc_id in test_suite.test_case_ids:
+            db.refresh(execution)
+            if execution.status == "cancelled":
+                logger.warning("Test suite execution %s cancelled by operator", execution_id)
+                overall_passed = False
+                break
+
             tc_def = (
                 db.query(AutomationDefinition)
                 .filter(AutomationDefinition.id == tc_id)
@@ -233,31 +266,37 @@ def execute_test_suite_task(
             tc_res = runner.execute_test_case(
                 execution_id=execution.id,
                 test_case=parsed_tc,
+                session_id=session_id,
+                manage_session=False,
             )
             suite_results.append({
                 "test_case_id": str(tc_id),
                 "name": parsed_tc.name,
                 "status": tc_res.get("status"),
-                "passed": tc_res.get("passed"),
+                "passed": tc_res.get("status") in ("passed", "completed"),
             })
-            if not tc_res.get("passed"):
+            if tc_res.get("status") not in ("passed", "completed"):
                 overall_passed = False
+                if test_suite.stop_on_failure:
+                    break
 
-        execution.status = "completed" if overall_passed else "failed"
-        execution.completed_at = datetime.now(timezone.utc)
-        execution.summary = {
-            "suite_name": test_suite.name,
-            "total_cases": len(test_suite.test_case_ids),
-            "passed": overall_passed,
-            "case_results": suite_results,
-        }
-        db.commit()
+        db.refresh(execution)
+        if execution.status != "cancelled":
+            execution.status = "completed" if overall_passed else "failed"
+            execution.completed_at = datetime.now(timezone.utc)
+            execution.summary = {
+                "suite_name": test_suite.name,
+                "total_cases": len(test_suite.test_case_ids),
+                "passed": overall_passed,
+                "case_results": suite_results,
+            }
+            db.commit()
         return execution.summary
     except Exception as err:
         logger.exception("Failed executing test suite task for execution %s: %s", execution_id, err)
         try:
             exec_rec = db.query(Execution).filter(Execution.id == execution_id).first()
-            if exec_rec and exec_rec.status not in ("completed", "failed"):
+            if exec_rec and exec_rec.status not in ("completed", "passed", "failed", "cancelled"):
                 exec_rec.status = "failed"
                 exec_rec.completed_at = datetime.now(timezone.utc)
                 exec_rec.summary = {"error": str(err), "passed": False}
@@ -269,8 +308,8 @@ def execute_test_suite_task(
         if session_id:
             try:
                 session_manager.close_session(session_id)
-            except Exception:
-                pass
+            except Exception as close_err:
+                logger.warning("Error closing session %s: %s", session_id, close_err)
         db.close()
 
 

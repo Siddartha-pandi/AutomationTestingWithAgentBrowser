@@ -43,16 +43,58 @@ export function ExecutionDetailsPage({
   const [zoomScreenshot, setZoomScreenshot] = useState<string | null>(null);
   const [execution, setExecution] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [logLevelFilter, setLogLevelFilter] = useState<string>("ALL");
+  const [logSearchQuery, setLogSearchQuery] = useState<string>("");
 
   const { success, info } = useToast();
   const { confirm } = useConfirm();
 
   useEffect(() => {
-    if (executionId) {
-      loadExecution();
-    } else {
+    if (!executionId) {
       setExecution(null);
+      return;
     }
+    loadExecution();
+
+    // Live WebSocket connection for running executions
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") || "" : "";
+    const wsProto = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsHost = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const wsUrl = `${wsProto}//${wsHost}:8000/ws/executions/${executionId}?token=${encodeURIComponent(token)}`;
+
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === "execution:status_change") {
+            setExecution((prev: any) =>
+              prev ? { ...prev, status: payload.data?.status || prev.status } : prev
+            );
+            if (["passed", "failed", "completed", "cancelled"].includes(payload.data?.status)) {
+              loadExecution();
+            }
+          } else if (payload.type === "step:complete" || payload.type === "step:failed") {
+            loadExecution();
+          } else if (payload.type === "console:log") {
+            setExecution((prev: any) => {
+              if (!prev) return prev;
+              const newLog = {
+                level: payload.data?.level || "INFO",
+                time: new Date(payload.timestamp).toLocaleTimeString(),
+                msg: payload.data?.message || "",
+              };
+              return { ...prev, logs: [...(prev.logs || []), newLog] };
+            });
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      if (ws) ws.close();
+    };
   }, [executionId]);
 
   const loadExecution = async () => {
@@ -162,6 +204,16 @@ export function ExecutionDetailsPage({
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span className="capitalize">{execution.status}</span>
           </span>
+
+          <a
+            href={executionsApi.getHtmlReportUrl(execution.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-500" />
+            <span>HTML Report</span>
+          </a>
 
           <button
             onClick={handleRerun}
@@ -302,24 +354,71 @@ export function ExecutionDetailsPage({
 
       {/* TAB 4: LOGS */}
       {activeTab === "logs" && (
-        <div className="p-4 rounded-2xl bg-slate-950 text-slate-200 font-mono text-xs space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
-          {logs.map((l: any, idx: number) => (
-            <div key={idx} className="flex items-start gap-3 leading-tight">
-              <span className="text-slate-500 shrink-0">{l.time}</span>
-              <span
-                className={`font-bold shrink-0 ${
-                  l.level === "INFO"
-                    ? "text-blue-400"
-                    : l.level === "DEBUG"
-                    ? "text-purple-400"
-                    : "text-amber-400"
-                }`}
-              >
-                [{l.level}]
-              </span>
-              <span className="text-slate-300 break-all">{l.msg}</span>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white dark:bg-[#161F30] rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5">
+              {["ALL", "INFO", "WARNING", "ERROR", "DEBUG"].map((lvl) => (
+                <button
+                  key={lvl}
+                  onClick={() => setLogLevelFilter(lvl)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition text-[11px] ${
+                    logLevelFilter === lvl
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  {lvl}
+                </button>
+              ))}
             </div>
-          ))}
+
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Search log stream..."
+                value={logSearchQuery}
+                onChange={(e) => setLogSearchQuery(e.target.value)}
+                className="px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent text-xs w-48 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+              />
+              <a
+                href={executionsApi.getLogsDownloadUrl(execution.id, "txt", logLevelFilter === "ALL" ? undefined : logLevelFilter)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-semibold flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-500" />
+                <span>Export TXT</span>
+              </a>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-950 text-slate-200 font-mono text-xs space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
+            {logs
+              .filter((l: any) => {
+                const matchesLevel = logLevelFilter === "ALL" || (l.level || "").toUpperCase() === logLevelFilter;
+                const matchesQuery = !logSearchQuery || (l.msg || "").toLowerCase().includes(logSearchQuery.toLowerCase());
+                return matchesLevel && matchesQuery;
+              })
+              .map((l: any, idx: number) => (
+                <div key={idx} className="flex items-start gap-3 leading-tight">
+                  <span className="text-slate-500 shrink-0">{l.time}</span>
+                  <span
+                    className={`font-bold shrink-0 ${
+                      l.level === "ERROR"
+                        ? "text-rose-400"
+                        : l.level === "WARNING"
+                        ? "text-amber-400"
+                        : l.level === "DEBUG"
+                        ? "text-purple-400"
+                        : "text-blue-400"
+                    }`}
+                  >
+                    [{l.level}]
+                  </span>
+                  <span className="text-slate-300 break-all">{l.msg}</span>
+                </div>
+              ))}
+          </div>
         </div>
       )}
 

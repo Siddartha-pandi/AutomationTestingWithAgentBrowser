@@ -61,6 +61,10 @@ app.add_middleware(
 # Mount Versioned Enterprise APIs
 app.include_router(api_v1_router)
 
+# Mount Root WebSocket Monitoring endpoint
+from backend.app.api.v1.ws_monitor import router as ws_monitor_router
+app.include_router(ws_monitor_router)
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()

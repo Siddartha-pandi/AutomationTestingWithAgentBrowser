@@ -34,56 +34,71 @@ class ProjectResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+def user_has_project_access(
+    db: Session,
+    project_id: UUID | None,
+    user: User,
+) -> bool:
+    """Checks whether the user owns or is a member of the specified project, or is a superuser."""
+    if not project_id or not user:
+        return False
+    if user.is_superuser:
+        return True
+    return (
+        db.query(Project)
+        .filter(
+            (Project.id == project_id)
+            & (
+                (Project.owner_id == user.id)
+                | (Project.members.any(ProjectMember.user_id == user.id))
+            )
+        )
+        .first()
+        is not None
+    )
+
+
 def resolve_project_id(
     db: Session,
     project_id: UUID | str | None,
     current_user_id: UUID | None = None,
+    is_superuser: bool = False,
 ) -> Project | None:
-    """Resolves a project UUID or alias slug (e.g. 'p1-default') to an existing Project model."""
+    """Resolves a project UUID or alias slug (e.g. 'p1-default') to an existing Project model with strict RBAC."""
+    if is_superuser:
+        if not project_id or project_id == "p1-default":
+            return db.query(Project).first()
+        if isinstance(project_id, str):
+            try:
+                parsed_uuid = UUID(project_id)
+                proj = db.query(Project).filter(Project.id == parsed_uuid).first()
+                if proj:
+                    return proj
+            except ValueError:
+                pass
+            return db.query(Project).filter(Project.name == project_id).first()
+        if isinstance(project_id, UUID):
+            return db.query(Project).filter(Project.id == project_id).first()
+        return None
+
+    if not current_user_id:
+        return None
+
+    user_filter = (Project.owner_id == current_user_id) | (Project.members.any(ProjectMember.user_id == current_user_id))
+
     if not project_id or project_id == "p1-default":
-        if current_user_id:
-            proj = (
-                db.query(Project)
-                .filter(
-                    (Project.owner_id == current_user_id)
-                    | (Project.members.any(ProjectMember.user_id == current_user_id))
-                )
-                .first()
-            )
-            if proj:
-                return proj
-            return None
-        # Fallback when running without user context (e.g. CLI or internal test runners)
-        return db.query(Project).first()
+        return db.query(Project).filter(user_filter).first()
 
     if isinstance(project_id, str):
         try:
             parsed_uuid = UUID(project_id)
-            proj = db.query(Project).filter(Project.id == parsed_uuid).first()
-            if proj:
-                return proj
+            return db.query(Project).filter((Project.id == parsed_uuid) & user_filter).first()
         except ValueError:
             pass
-
-        # Try to find by name for this user
-        if current_user_id:
-            proj = (
-                db.query(Project)
-                .filter(
-                    (Project.name == project_id)
-                    & (
-                        (Project.owner_id == current_user_id)
-                        | (Project.members.any(ProjectMember.user_id == current_user_id))
-                    )
-                )
-                .first()
-            )
-            if proj:
-                return proj
-        return None
+        return db.query(Project).filter((Project.name == project_id) & user_filter).first()
 
     if isinstance(project_id, UUID):
-        return db.query(Project).filter(Project.id == project_id).first()
+        return db.query(Project).filter((Project.id == project_id) & user_filter).first()
 
     return None
 
@@ -160,7 +175,7 @@ def get_project(
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Retrieve detailed project configuration."""
-    proj = resolve_project_id(db, project_id, current_user.id)
+    proj = resolve_project_id(db, project_id, current_user.id, is_superuser=current_user.is_superuser)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
     return {
@@ -184,7 +199,7 @@ def list_project_members(
     current_user: User = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     """List all team members assigned to a project."""
-    proj = resolve_project_id(db, project_id, current_user.id)
+    proj = resolve_project_id(db, project_id, current_user.id, is_superuser=current_user.is_superuser)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -209,7 +224,7 @@ def add_project_member(
     current_user: User = Depends(require_permission("users:manage", "create")),
 ) -> dict[str, Any]:
     """Assign a user to a project with a specific access role."""
-    proj = resolve_project_id(db, project_id, current_user.id)
+    proj = resolve_project_id(db, project_id, current_user.id, is_superuser=current_user.is_superuser)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 
@@ -254,7 +269,7 @@ def remove_project_member(
     current_user: User = Depends(require_permission("users:manage", "create")),
 ):
     """Remove a user from a project."""
-    proj = resolve_project_id(db, project_id, current_user.id)
+    proj = resolve_project_id(db, project_id, current_user.id, is_superuser=current_user.is_superuser)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
 

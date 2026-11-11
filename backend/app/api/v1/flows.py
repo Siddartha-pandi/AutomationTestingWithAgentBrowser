@@ -9,16 +9,18 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from backend.app.browser import AgentBrowserAdapter, SessionManager
 from backend.app.db.session import get_db
 from backend.app.engine.flows.flow_executor import FlowExecutor
 from backend.app.engine.flows.flow_schema import FlowGraphDefinition
+from backend.app.engine.selectors import validate_selector
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.execution import Execution
 from backend.app.models.project import Project, ProjectMember
-from backend.app.api.v1.projects import resolve_project_id
+from backend.app.api.v1.projects import resolve_project_id, user_has_project_access
 from backend.app.schemas.flows import (
     ExecuteFlowRequest,
     ExecutionDetailResponse,
@@ -221,6 +223,59 @@ def list_flow_templates(
     return FLOW_TEMPLATES
 
 
+class ValidateFlowRequest(BaseModel):
+    definition: FlowGraphDefinition
+
+
+@router.post("/validate")
+def validate_flow_definition(
+    payload: ValidateFlowRequest,
+    current_user=Depends(require_permission("flows:read")),
+) -> dict[str, Any]:
+    """Deterministically validates a React Flow workflow graph before saving or execution."""
+    nodes = payload.definition.nodes
+    edges = payload.definition.edges
+
+    warnings: list[str] = []
+    node_ids = {n.id for n in nodes}
+
+    # Verify edge connectivity
+    for edge in edges:
+        if edge.source not in node_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Edge '{edge.id}' references non-existent source node '{edge.source}'",
+            )
+        if edge.target not in node_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Edge '{edge.id}' references non-existent target node '{edge.target}'",
+            )
+
+    # Validate selectors on action nodes
+    for node in nodes:
+        target = node.config.get("target") or {}
+        sel = target.get("selector")
+        if sel:
+            is_valid, err = validate_selector(sel)
+            if not is_valid:
+                warnings.append(f"Node '{node.id}' has invalid selector '{sel}': {err}")
+
+    # Check for isolated/unreachable nodes (except root)
+    if nodes:
+        target_ids = {e.target for e in edges}
+        for n in nodes[1:]:
+            if n.id not in target_ids:
+                warnings.append(f"Node '{n.id}' has no incoming edges and may be unreachable.")
+
+    return {
+        "valid": True,
+        "node_count": len(nodes),
+        "edge_count": len(edges),
+        "warnings": warnings,
+    }
+
+
 
 @router.get("", response_model=list[FlowResponse])
 def list_flows(
@@ -289,7 +344,7 @@ def get_flow(
         .filter(AutomationDefinition.id == flow_id, AutomationDefinition.type == "flow")
         .first()
     )
-    if not flow:
+    if not flow or not user_has_project_access(db, flow.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flow not found")
 
     latest_ver = flow.versions[0] if flow.versions else None
@@ -324,7 +379,7 @@ def update_flow(
         .filter(AutomationDefinition.id == flow_id, AutomationDefinition.type == "flow")
         .first()
     )
-    if not flow:
+    if not flow or not user_has_project_access(db, flow.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flow not found")
 
     if payload.name:
@@ -412,7 +467,7 @@ def publish_flow(
         .filter(AutomationDefinition.id == flow_id, AutomationDefinition.type == "flow")
         .first()
     )
-    if not flow:
+    if not flow or not user_has_project_access(db, flow.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flow not found")
 
     if not flow.versions:
@@ -459,7 +514,7 @@ def execute_flow_endpoint(
         .filter(AutomationDefinition.id == flow_id, AutomationDefinition.type == "flow")
         .first()
     )
-    if not flow:
+    if not flow or not user_has_project_access(db, flow.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flow not found")
 
     # Select version to execute
@@ -504,19 +559,33 @@ def execute_flow_endpoint(
 
     if payload.async_exec:
         from backend.app.worker.tasks import execute_flow_task
-        execute_flow_task.delay(str(execution.id), payload.initial_variables)
+        task = execute_flow_task.delay(str(execution.id), payload.initial_variables)
+        execution.summary = {"celery_task_id": task.id}
+        db.commit()
         return ExecutionDetailResponse.model_validate(execution)
 
     # 2. Run Flow via FlowExecutor synchronously
     adapter = AgentBrowserAdapter()
-    session_mgr = SessionManager()
-    executor = FlowExecutor(adapter=adapter, session_manager=session_mgr, db=db)
-
-    executor.execute_flow(
-        execution_id=execution.id,
-        flow_graph=graph_def,
-        initial_variables=payload.initial_variables,
+    session_mgr = adapter.session_manager
+    session = session_mgr.create_session(
+        execution_id=str(execution.id),
+        project_id=str(execution.project_id) if execution.project_id else None,
+        user_id=str(current_user.id),
     )
+    session_id = session.session_id
+    execution.session_id = session_id
+    db.commit()
+
+    executor = FlowExecutor(adapter=adapter, session_manager=session_mgr, db=db)
+    try:
+        executor.execute_flow(
+            execution_id=execution.id,
+            flow_graph=graph_def,
+            initial_variables=payload.initial_variables,
+            session_id=session_id,
+        )
+    finally:
+        session_mgr.close_session(session_id)
 
     db.refresh(execution)
 

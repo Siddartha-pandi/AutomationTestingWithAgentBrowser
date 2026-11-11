@@ -30,6 +30,10 @@ class ScreenshotResult:
     captured_at: datetime
     full_page: bool
 
+    @property
+    def screenshot_path(self) -> str:
+        return self.file_path
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "file_path": self.file_path,

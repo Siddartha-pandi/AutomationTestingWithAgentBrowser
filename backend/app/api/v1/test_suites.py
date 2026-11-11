@@ -18,7 +18,7 @@ from backend.app.engine.testing.test_schema import TestCaseDefinition, TestSuite
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.execution import Execution
 from backend.app.models.project import Project, ProjectMember
-from backend.app.api.v1.projects import resolve_project_id
+from backend.app.api.v1.projects import resolve_project_id, user_has_project_access
 from backend.app.schemas.flows import ExecutionDetailResponse
 from backend.app.schemas.testing import ExecuteTestRequest, TestSuiteCreateRequest, TestSuiteResponse
 from backend.app.security.audit import log_audit_event
@@ -157,7 +157,7 @@ def get_test_suite(
         .filter(AutomationDefinition.id == suite_id, AutomationDefinition.type == "test_suite")
         .first()
     )
-    if not suite:
+    if not suite or not user_has_project_access(db, suite.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test suite not found")
 
     latest_ver = suite.versions[0] if suite.versions else None
@@ -188,7 +188,7 @@ def execute_test_suite_endpoint(
         .filter(AutomationDefinition.id == suite_id, AutomationDefinition.type == "test_suite")
         .first()
     )
-    if not suite:
+    if not suite or not user_has_project_access(db, suite.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test suite not found")
 
     if not suite.versions:
@@ -205,15 +205,33 @@ def execute_test_suite_endpoint(
         environment_id=payload.environment_id,
         trigger_type="manual",
         triggered_by=current_user.id,
-        status="running",
+        status="queued" if payload.async_exec else "running",
         summary={},
     )
     db.add(suite_execution)
     db.commit()
     db.refresh(suite_execution)
 
+    if payload.async_exec:
+        from backend.app.worker.tasks import execute_test_suite_task
+        task = execute_test_suite_task.delay(str(suite_execution.id))
+        suite_execution.summary = {"celery_task_id": task.id}
+        db.commit()
+        return ExecutionDetailResponse.model_validate(suite_execution)
+
     adapter = AgentBrowserAdapter()
-    session_mgr = SessionManager()
+    session_mgr = adapter.session_manager
+    session = session_mgr.create_session(
+        execution_id=str(suite_execution.id),
+        project_id=str(suite_execution.project_id) if suite_execution.project_id else None,
+        user_id=str(current_user.id),
+    )
+    session_id = session.session_id
+    suite_execution.session_id = session_id
+    suite_execution.status = "running"
+    suite_execution.started_at = datetime.now(timezone.utc)
+    db.commit()
+
     runner = TestRunner(adapter=adapter, session_manager=session_mgr, db=db)
 
     # 2. Iterate through each member test case
@@ -221,45 +239,56 @@ def execute_test_suite_endpoint(
     cases_failed = 0
     test_case_results = []
 
-    for tc_uuid in suite_def.test_case_ids:
-        tc_record = (
-            db.query(AutomationDefinition)
-            .options(joinedload(AutomationDefinition.versions))
-            .filter(AutomationDefinition.id == tc_uuid)
-            .first()
-        )
-        if not tc_record or not tc_record.versions:
-            continue
-
-        tc_ver = tc_record.versions[0]
-        tc_def = TestCaseDefinition.model_validate(tc_ver.definition_json)
-
-        # Run member test case
-        case_run = runner.execute_test_case(
-            execution_id=suite_execution.id,
-            test_case=tc_def,
-            test_data_row=payload.test_data_row,
-        )
-        test_case_results.append(case_run)
-
-        if case_run["status"] == "passed":
-            cases_passed += 1
-        else:
-            cases_failed += 1
-            if suite_def.stop_on_failure:
+    try:
+        for tc_uuid in suite_def.test_case_ids:
+            db.refresh(suite_execution)
+            if suite_execution.status == "cancelled":
                 break
 
-    # 3. Finalize Suite Execution summary
-    suite_execution.status = "passed" if cases_failed == 0 else "failed"
-    suite_execution.completed_at = datetime.now(timezone.utc)
-    suite_execution.summary = {
-        "cases_total": len(suite_def.test_case_ids),
-        "cases_executed": len(test_case_results),
-        "cases_passed": cases_passed,
-        "cases_failed": cases_failed,
-    }
-    db.commit()
-    db.refresh(suite_execution)
+            tc_record = (
+                db.query(AutomationDefinition)
+                .options(joinedload(AutomationDefinition.versions))
+                .filter(AutomationDefinition.id == tc_uuid)
+                .first()
+            )
+            if not tc_record or not tc_record.versions:
+                continue
+
+            tc_ver = tc_record.versions[0]
+            tc_def = TestCaseDefinition.model_validate(tc_ver.definition_json)
+
+            # Run member test case
+            case_run = runner.execute_test_case(
+                execution_id=suite_execution.id,
+                test_case=tc_def,
+                test_data_row=payload.test_data_row,
+                session_id=session_id,
+                manage_session=False,
+            )
+            test_case_results.append(case_run)
+
+            if case_run.get("status") in ("passed", "completed"):
+                cases_passed += 1
+            else:
+                cases_failed += 1
+                if suite_def.stop_on_failure:
+                    break
+
+        # 3. Finalize Suite Execution summary
+        db.refresh(suite_execution)
+        if suite_execution.status != "cancelled":
+            suite_execution.status = "passed" if cases_failed == 0 else "failed"
+            suite_execution.completed_at = datetime.now(timezone.utc)
+            suite_execution.summary = {
+                "cases_total": len(suite_def.test_case_ids),
+                "cases_executed": len(test_case_results),
+                "cases_passed": cases_passed,
+                "cases_failed": cases_failed,
+            }
+            db.commit()
+            db.refresh(suite_execution)
+    finally:
+        session_mgr.close_session(session_id)
 
     execution_detail = (
         db.query(Execution)

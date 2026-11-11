@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from backend.app.db.session import get_db
 from backend.app.models.intelligence import ElementProfile, LocatorHistory
 from backend.app.models.project import Project
-from backend.app.api.v1.projects import resolve_project_id
+from backend.app.api.v1.projects import resolve_project_id, user_has_project_access
 from backend.app.schemas.intelligence import (
     ElementProfileCreate,
     ElementProfileResponse,
@@ -107,7 +109,7 @@ def list_element_profiles(
     db: Session = Depends(get_db),
 ) -> list[ElementProfileResponse]:
     """Lists element profiles registered within a project."""
-    proj = resolve_project_id(db, project_id)
+    proj = resolve_project_id(db, project_id, current_user.id)
     if not proj:
         return []
 
@@ -136,7 +138,7 @@ def get_element_profile(
         .filter(ElementProfile.id == profile_id)
         .first()
     )
-    if not profile:
+    if not profile or not user_has_project_access(db, profile.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element profile not found")
     return ElementProfileResponse.model_validate(profile)
 
@@ -156,7 +158,7 @@ def update_element_profile(
         .filter(ElementProfile.id == profile_id)
         .first()
     )
-    if not profile:
+    if not profile or not user_has_project_access(db, profile.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element profile not found")
 
     if payload.description is not None:
@@ -168,6 +170,7 @@ def update_element_profile(
     if payload.structural_fingerprint is not None:
         profile.structural_fingerprint = payload.structural_fingerprint
 
+    profile.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(profile)
 
@@ -184,6 +187,48 @@ def update_element_profile(
     return ElementProfileResponse.model_validate(profile)
 
 
+class AddLocatorPayload(BaseModel):
+    locator_type: str  # css, xpath, role_name, stable_attribute, text
+    locator_value: str
+    success_count: int = 1
+
+
+@router.post("/{profile_id}/locators", response_model=ElementProfileResponse)
+def add_locator_to_profile(
+    profile_id: UUID,
+    payload: AddLocatorPayload,
+    current_user=Depends(require_permission("flows:create_edit")),
+    db: Session = Depends(get_db),
+) -> ElementProfileResponse:
+    """Adds or updates a verified locator in the element profile's history."""
+    profile = (
+        db.query(ElementProfile)
+        .options(joinedload(ElementProfile.history))
+        .filter(ElementProfile.id == profile_id)
+        .first()
+    )
+    if not profile or not user_has_project_access(db, profile.project_id, current_user):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element profile not found")
+
+    existing = next((h for h in profile.history if h.locator_value == payload.locator_value), None)
+    if existing:
+        existing.success_count += payload.success_count
+        existing.last_verified_at = datetime.now(timezone.utc)
+    else:
+        new_loc = LocatorHistory(
+            element_profile_id=profile.id,
+            locator_type=payload.locator_type,
+            locator_value=payload.locator_value,
+            success_count=payload.success_count,
+        )
+        db.add(new_loc)
+
+    profile.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(profile)
+    return ElementProfileResponse.model_validate(profile)
+
+
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_element_profile(
     profile_id: UUID,
@@ -193,7 +238,7 @@ def delete_element_profile(
 ) -> None:
     """Deletes an element profile."""
     profile = db.query(ElementProfile).filter(ElementProfile.id == profile_id).first()
-    if not profile:
+    if not profile or not user_has_project_access(db, profile.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Element profile not found")
 
     logical_id = profile.logical_id

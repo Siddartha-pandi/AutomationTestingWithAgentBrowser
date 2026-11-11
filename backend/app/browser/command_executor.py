@@ -178,6 +178,12 @@ class CommandExecutor:
         exec_path = self._resolve_executable_path()
         if exec_path and "--executable-path" not in args:
             cmd.extend(["--executable-path", exec_path])
+
+        # Forward container-level browser flags if configured (e.g. headless sandbox arguments)
+        browser_args = os.getenv("AGENT_BROWSER_ARGS")
+        if browser_args and "--args" not in args:
+            cmd.extend(["--args", browser_args])
+
         if parse_json and "--json" not in args:
             cmd.append("--json")
         cmd.extend(args)

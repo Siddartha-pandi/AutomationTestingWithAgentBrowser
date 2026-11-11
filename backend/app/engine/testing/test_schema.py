@@ -33,6 +33,7 @@ class TestStep(BaseModel):
     expected: Any = None
     attribute_name: str | None = None
     on_failure: str = Field(default="stop", pattern="^(stop|continue)$")
+    retries: int = Field(default=0, ge=0, le=5)
 
     @model_validator(mode="after")
     def validate_step_consistency(self) -> TestStep:
@@ -68,6 +69,7 @@ class TestSuiteDefinition(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
     test_case_ids: list[UUID] = Field(min_length=1)
+    tags: list[str] = Field(default_factory=list)
     execution_mode: str = Field(default="sequential", pattern="^(sequential|parallel_isolated)$")
     stop_on_failure: bool = False
 

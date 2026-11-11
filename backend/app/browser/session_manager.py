@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .browser_errors import SessionIsolationError
+from .browser_errors import AgentBrowserError, SessionIsolationError
 from .command_executor import CommandExecutor
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ class BrowserSession:
 
     session_id: str
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    user_id: str | None = None
     project_id: str | None = None
     execution_id: str | None = None
     allowed_domains: list[str] = field(default_factory=list)
@@ -37,6 +38,7 @@ class BrowserSession:
         return {
             "session_id": self.session_id,
             "created_at": self.created_at.isoformat(),
+            "user_id": self.user_id,
             "project_id": self.project_id,
             "execution_id": self.execution_id,
             "allowed_domains": self.allowed_domains,
@@ -50,10 +52,10 @@ class SessionManager:
 
     def __init__(
         self,
-        executor: CommandExecutor,
+        executor: CommandExecutor | None = None,
         base_storage_dir: Path | str = "./reports",
     ) -> None:
-        self.executor = executor
+        self.executor = executor or CommandExecutor(agent_home_dir=f"{base_storage_dir}/agent_home")
         self.base_storage_dir = Path(base_storage_dir).resolve()
         self._active_sessions: dict[str, BrowserSession] = {}
 
@@ -63,6 +65,7 @@ class SessionManager:
         project_id: str | None = None,
         execution_id: str | None = None,
         allowed_domains: list[str] | None = None,
+        user_id: str | None = None,
     ) -> BrowserSession:
         """Creates and tracks a new isolated browser session."""
         # Sanitize session ID to alphanumeric, dashes, and underscores per CLI requirements
@@ -83,15 +86,33 @@ class SessionManager:
 
         session = BrowserSession(
             session_id=safe_id,
-            project_id=project_id,
-            execution_id=execution_id,
-            allowed_domains=allowed_domains or self.executor.allowed_domains,
+            user_id=str(user_id) if user_id else None,
+            project_id=str(project_id) if project_id else None,
+            execution_id=str(execution_id) if execution_id else None,
+            allowed_domains=allowed_domains or list(self.executor.allowed_domains),
             session_dir=session_dir,
             is_active=True,
         )
 
         self._active_sessions[safe_id] = session
         logger.info("Initialized isolated Agent Browser session: %s", safe_id)
+        return session
+
+    def validate_session_access(
+        self,
+        session_id: str,
+        user_id: str | uuid.UUID | None = None,
+        is_superuser: bool = False,
+    ) -> BrowserSession:
+        """Validates session existence, lifecycle state, and ownership."""
+        session = self._active_sessions.get(session_id)
+        if not session:
+            raise SessionIsolationError(session_id, f"Browser session '{session_id}' not found")
+        if not session.is_active:
+            raise SessionIsolationError(session_id, f"Browser session '{session_id}' is no longer active (closed)")
+        if not is_superuser and user_id is not None and session.user_id is not None:
+            if str(session.user_id) != str(user_id):
+                raise SessionIsolationError(session_id, f"Access denied to browser session '{session_id}'")
         return session
 
     def get_session(self, session_id: str) -> BrowserSession | None:

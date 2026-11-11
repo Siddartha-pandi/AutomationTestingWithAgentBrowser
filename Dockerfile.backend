@@ -9,7 +9,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     STORAGE_DIR=/app/reports \
-    AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+    AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium \
+    AGENT_BROWSER_ARGS="--no-sandbox --disable-dev-shm-usage --disable-gpu"
 
 WORKDIR /app
 
@@ -56,11 +57,16 @@ COPY tests /app/tests
 COPY scripts /app/scripts
 COPY pytest.ini /app/pytest.ini
 
-# 5. Create storage directories with permissions
-RUN mkdir -p /app/reports/screenshots /app/reports/dom_snapshots /app/reports/artifacts /app/reports/exports
+# 5. Create storage directories, non-root system user, and configure permissions
+RUN mkdir -p /app/reports/screenshots /app/reports/dom_snapshots /app/reports/artifacts /app/reports/exports \
+    && groupadd -r -g 1001 appuser \
+    && useradd -r -u 1001 -g appuser -m -d /home/appuser appuser \
+    && chown -R appuser:appuser /app /home/appuser \
+    && chmod -R 775 /app/reports
+
+USER appuser
 
 EXPOSE 8000
 
 # Default command launches FastAPI via uvicorn
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

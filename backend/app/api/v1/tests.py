@@ -19,7 +19,7 @@ from backend.app.models.automation import AutomationDefinition, DefinitionVersio
 from backend.app.models.execution import Execution
 from backend.app.models.project import Project, ProjectMember, TestDataset
 from pydantic import BaseModel, ConfigDict, Field
-from backend.app.api.v1.projects import resolve_project_id
+from backend.app.api.v1.projects import resolve_project_id, user_has_project_access
 from backend.app.schemas.flows import ExecutionDetailResponse, PublishVersionResponse
 from backend.app.schemas.testing import (
     ExecuteTestRequest,
@@ -263,7 +263,7 @@ def get_test_case(
         .filter(AutomationDefinition.id == test_id, AutomationDefinition.type == "test")
         .first()
     )
-    if not test:
+    if not test or not user_has_project_access(db, test.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
 
     latest_ver = test.versions[0] if test.versions else None
@@ -298,7 +298,7 @@ def update_test_case(
         .filter(AutomationDefinition.id == test_id, AutomationDefinition.type == "test")
         .first()
     )
-    if not test:
+    if not test or not user_has_project_access(db, test.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
 
     if payload.name:
@@ -384,7 +384,7 @@ def publish_test_case(
         .filter(AutomationDefinition.id == test_id, AutomationDefinition.type == "test")
         .first()
     )
-    if not test:
+    if not test or not user_has_project_access(db, test.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
 
     if not test.versions:
@@ -431,7 +431,7 @@ def execute_test_case_endpoint(
         .filter(AutomationDefinition.id == test_id, AutomationDefinition.type == "test")
         .first()
     )
-    if not test:
+    if not test or not user_has_project_access(db, test.project_id, current_user):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test case not found")
 
     target_version: DefinitionVersion | None = None
@@ -474,19 +474,33 @@ def execute_test_case_endpoint(
 
     if payload.async_exec:
         from backend.app.worker.tasks import execute_test_case_task
-        execute_test_case_task.delay(str(execution.id), payload.test_data_row)
+        task = execute_test_case_task.delay(str(execution.id), payload.test_data_row)
+        execution.summary = {"celery_task_id": task.id}
+        db.commit()
         return ExecutionDetailResponse.model_validate(execution)
 
     # 2. Run Test Case via TestRunner synchronously
     adapter = AgentBrowserAdapter()
-    session_mgr = SessionManager()
-    runner = TestRunner(adapter=adapter, session_manager=session_mgr, db=db)
-
-    runner.execute_test_case(
-        execution_id=execution.id,
-        test_case=test_case_def,
-        test_data_row=payload.test_data_row,
+    session_mgr = adapter.session_manager
+    session = session_mgr.create_session(
+        execution_id=str(execution.id),
+        project_id=str(execution.project_id) if execution.project_id else None,
+        user_id=str(current_user.id),
     )
+    session_id = session.session_id
+    execution.session_id = session_id
+    db.commit()
+
+    runner = TestRunner(adapter=adapter, session_manager=session_mgr, db=db)
+    try:
+        runner.execute_test_case(
+            execution_id=execution.id,
+            test_case=test_case_def,
+            test_data_row=payload.test_data_row,
+            session_id=session_id,
+        )
+    finally:
+        session_mgr.close_session(session_id)
 
     db.refresh(execution)
 

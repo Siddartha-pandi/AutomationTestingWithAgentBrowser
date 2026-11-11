@@ -56,7 +56,7 @@ import {
   ArrowDown,
   Search,
 } from "lucide-react";
-import { flowsApi } from "../../api";
+import { flowsApi, browserApi } from "../../api";
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
 
@@ -173,6 +173,43 @@ const ConditionNode = ({ data, selected }: NodeProps) => (
   </div>
 );
 
+const LoopNode = ({ data, selected }: NodeProps) => (
+  <div
+    className={`px-3.5 py-2.5 rounded-xl bg-violet-50 dark:bg-violet-950/40 border transition shadow-sm min-w-[190px] text-xs ${
+      selected
+        ? "border-violet-600 ring-2 ring-violet-500/20 shadow-md"
+        : "border-violet-200 dark:border-violet-800"
+    }`}
+  >
+    <Handle type="target" position={Position.Top} className="!bg-violet-600 !w-2 !h-2" />
+    <div className="flex items-center gap-2 font-bold text-violet-800 dark:text-violet-300">
+      <Repeat className="w-4 h-4" />
+      <span>Loop (for/while)</span>
+    </div>
+    <div className="mt-1 text-[11px] text-violet-700 dark:text-violet-400 font-mono truncate">
+      {`Iterations: ${(data as any).config?.iterations || (data as any).config?.max_iterations || 10}`}
+    </div>
+    <div className="flex justify-between items-center text-[10px] text-violet-600 dark:text-violet-400 mt-1 px-1 font-semibold">
+      <span>Body</span>
+      <span>Exit</span>
+    </div>
+    <Handle
+      id="loop_body"
+      type="source"
+      position={Position.Bottom}
+      style={{ left: "25%" }}
+      className="!bg-violet-500 !w-2 !h-2"
+    />
+    <Handle
+      id="loop_exit"
+      type="source"
+      position={Position.Bottom}
+      style={{ left: "75%" }}
+      className="!bg-slate-400 !w-2 !h-2"
+    />
+  </div>
+);
+
 const StopNode = ({ selected }: NodeProps) => (
   <div
     className={`px-3.5 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border transition min-w-[130px] text-center text-xs font-bold text-rose-700 dark:text-rose-400 ${
@@ -199,16 +236,28 @@ const ACTION_CATALOG = [
   { action: "hover", label: "Hover Element", icon: Eye, category: "Browser" },
   { action: "fill", label: "Fill Input", icon: Edit3, category: "Browser" },
   { action: "type", label: "Type Text", icon: Edit3, category: "Browser" },
+  { action: "press_key", label: "Press Key", icon: Edit3, category: "Browser" },
+  { action: "keyboard_type", label: "Keyboard Type", icon: Edit3, category: "Browser" },
+  { action: "focus", label: "Focus Element", icon: Crosshair, category: "Browser" },
+  { action: "clear", label: "Clear Input", icon: Trash2, category: "Browser" },
   { action: "select", label: "Select Option", icon: ListOrdered, category: "Browser" },
   { action: "check", label: "Check Checkbox", icon: CheckSquare, category: "Browser" },
   { action: "uncheck", label: "Uncheck Checkbox", icon: CheckSquare, category: "Browser" },
   { action: "scroll", label: "Scroll Page", icon: ArrowDown, category: "Browser" },
+  { action: "scroll_into_view", label: "Scroll Into View", icon: ArrowDown, category: "Browser" },
+  { action: "drag_and_drop", label: "Drag & Drop", icon: MousePointer, category: "Browser" },
+  { action: "upload_file", label: "Upload File", icon: UploadCloud, category: "Browser" },
   { action: "wait", label: "Wait Delay", icon: Clock, category: "Browser" },
   { action: "wait_until", label: "Wait Until State", icon: Clock, category: "Browser" },
+  { action: "wait_for_element", label: "Wait For Element", icon: Clock, category: "Browser" },
+  { action: "wait_for_url", label: "Wait For URL", icon: Globe, category: "Browser" },
+  { action: "wait_for_text", label: "Wait For Text", icon: FileText, category: "Browser" },
+  { action: "wait_for_network_idle", label: "Wait Network Idle", icon: Activity, category: "Browser" },
   { action: "screenshot", label: "Screenshot", icon: Camera, category: "Browser" },
   { action: "browser_back", label: "Browser Back", icon: ArrowLeft, category: "Browser" },
   { action: "browser_forward", label: "Browser Forward", icon: ArrowRight, category: "Browser" },
   { action: "refresh", label: "Refresh Page", icon: RotateCw, category: "Browser" },
+  { action: "evaluate_js", label: "Run JavaScript", icon: Code, category: "Browser" },
   { action: "extract_text", label: "Extract Text", icon: FileText, category: "Browser" },
   { action: "extract_attribute", label: "Extract Attribute", icon: FileText, category: "Browser" },
   { action: "extract_table", label: "Extract Table", icon: Table, category: "Browser" },
@@ -255,6 +304,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
     () => ({
       action: ActionNode,
       condition: ConditionNode,
+      loop: LoopNode,
       stop: StopNode,
     }),
     []
@@ -295,30 +345,49 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
   // Add node from left action catalog
   const addNodeFromCatalog = (action: string) => {
     const newId = `node_${Date.now()}`;
-    const type = action === "condition" ? "condition" : action === "stop" ? "stop" : "action";
+    const type =
+      action === "condition"
+        ? "condition"
+        : action === "stop"
+        ? "stop"
+        : action === "loop" || action === "while_loop"
+        ? "loop"
+        : "action";
 
     const defaultConfigs: Record<string, any> = {
       // Browser
       navigate: { url: "https://example.com", timeout: 30, wait_until: "load" },
-      click: { logical_id: "button_element", recognition_strategy: "deterministic_multi_factor", timeout: 15 },
-      double_click: { logical_id: "grid_row", timeout: 10 },
-      right_click: { logical_id: "context_menu_target" },
-      hover: { logical_id: "nav_dropdown" },
-      fill: { logical_id: "input_element", value_template: "Sample Input", is_secret: false },
-      type: { logical_id: "input_element", text: "Hello World", delay_ms: 50 },
-      select: { logical_id: "dropdown_element", option_value: "1" },
-      check: { logical_id: "terms_checkbox" },
-      uncheck: { logical_id: "newsletter_checkbox" },
+      click: { selector: "", logical_id: "button_element", recognition_strategy: "deterministic_multi_factor", timeout: 15, retry_count: 0 },
+      double_click: { selector: "", logical_id: "grid_row", timeout: 10 },
+      right_click: { selector: "", logical_id: "context_menu_target" },
+      hover: { selector: "", logical_id: "nav_dropdown" },
+      fill: { selector: "", logical_id: "input_element", value_template: "Sample Input", is_secret: false },
+      type: { selector: "", logical_id: "input_element", text: "Hello World", delay_ms: 50 },
+      press_key: { key: "Enter" },
+      keyboard_type: { text: "Hello World" },
+      focus: { selector: "" },
+      clear: { selector: "" },
+      scroll_into_view: { selector: "" },
+      drag_and_drop: { source_selector: "", destination_selector: "" },
+      upload_file: { selector: "", files: [] },
+      select: { selector: "", logical_id: "dropdown_element", option_value: "1" },
+      check: { selector: "", logical_id: "terms_checkbox" },
+      uncheck: { selector: "", logical_id: "newsletter_checkbox" },
       scroll: { direction: "down", amount: 400 },
       wait: { duration_ms: 2000, condition: "none" },
       wait_until: { selector: "#target-element", condition: "visible", timeout_ms: 10000 },
+      wait_for_element: { selector: "", state: "visible", timeout_ms: 10000 },
+      wait_for_url: { url_pattern: "https://example.com/success", is_regex: false, timeout_ms: 10000 },
+      wait_for_text: { selector: "body", text: "Welcome", exact: false, timeout_ms: 10000 },
+      wait_for_network_idle: { timeout_ms: 10000 },
       screenshot: { filename: "step_capture.png", full_page: false },
       browser_back: {},
       browser_forward: {},
       refresh: {},
-      extract_text: { logical_id: "heading_element", target_variable: "extracted_header" },
-      extract_attribute: { logical_id: "link_element", attribute_name: "href", target_variable: "extracted_link" },
-      extract_table: { logical_id: "data_table", target_variable: "table_rows" },
+      evaluate_js: { script: "return document.title;", variable_name: "page_title" },
+      extract_text: { selector: "", logical_id: "heading_element", target_variable: "extracted_header" },
+      extract_attribute: { selector: "", logical_id: "link_element", attribute_name: "href", target_variable: "extracted_link" },
+      extract_table: { selector: "", logical_id: "data_table", target_variable: "table_rows" },
 
       // Logic
       condition: { variable: "status_code", operator: "==", expected_value: "200" },
@@ -394,27 +463,41 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
     });
   };
 
-  // Validate Flow DAG
-  const handleValidateDAG = () => {
+  // Validate Flow DAG with backend engine
+  const handleValidateDAG = async () => {
     if (nodes.length === 0) {
       error("Validation Failed", "Workflow canvas must have at least one node.");
       return;
     }
-    // Check missing mandatory fields
-    const invalidNodes = nodes.filter((n) => {
-      const c = (n.data?.config as any) || {};
-      if (n.data?.action === "navigate" && !c.url) return true;
-      if (["click", "fill", "type", "select"].includes(String(n.data?.action)) && !c.logical_id) return true;
-      return false;
-    });
 
-    if (invalidNodes.length > 0) {
-      warning("Configuration Incomplete", `${invalidNodes.length} node(s) require target URLs or element IDs.`);
-      setSelectedNodeId(invalidNodes[0].id);
-      return;
+    const flowDef = {
+      name,
+      start_node_id: nodes[0]?.id,
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        action: n.data.action,
+        config: n.data.config || {},
+        position: n.position,
+      })),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        source_handle: e.sourceHandle || null,
+      })),
+    };
+
+    try {
+      const res = await flowsApi.validate(flowDef);
+      if (res.warnings && res.warnings.length > 0) {
+        warning("Graph Topology Warnings", res.warnings.join(" | "));
+      } else {
+        success("DAG Validated", `Workflow topology verified (${res.node_count} nodes, ${res.edge_count} edges).`);
+      }
+    } catch (err: any) {
+      error("DAG Validation Failed", err.message || "Invalid flow graph topology.");
     }
-
-    success("DAG Validated", "Workflow graph topology is complete and validated.");
   };
 
   // Save Draft to PostgreSQL
@@ -705,30 +788,304 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
                   </div>
                 )}
 
-                {(["click", "double_click", "right_click", "hover", "check", "uncheck"].includes(String(selectedNode.data?.action))) && (
+                {(["click", "double_click", "right_click", "hover", "check", "uncheck", "focus", "clear", "scroll_into_view"].includes(String(selectedNode.data?.action))) && (
                   <div className="space-y-3">
                     <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Element Logical ID *</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">Target Selector</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sel = (selectedNode.data?.config as any)?.selector;
+                            if (sel) {
+                              browserApi.validateSelector(sel)
+                                .then((r) => r.is_valid ? success("Valid Selector", `Recognized as ${r.selector_type.toUpperCase()}`) : error("Invalid Selector", r.error_message))
+                                .catch((e) => error("Validation Error", e.message));
+                            } else {
+                              warning("Empty Selector", "Enter a selector first.");
+                            }
+                          }}
+                          className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> Check Syntax
+                        </button>
+                      </div>
                       <input
                         type="text"
-                        value={(selectedNode.data?.config as any)?.logical_id || ""}
-                        onChange={(e) => updateConfig("logical_id", e.target.value)}
-                        placeholder="e.g. submit_order_button"
+                        value={(selectedNode.data?.config as any)?.selector || ""}
+                        onChange={(e) => updateConfig("selector", e.target.value)}
+                        placeholder="#submit-btn, testid=order, role=button"
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Recognition Strategy</label>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Fallbacks (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={((selectedNode.data?.config as any)?.fallbacks || []).join(", ")}
+                        onChange={(e) => updateConfig("fallbacks", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+                        placeholder=".backup-btn, button[type='submit']"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono text-[11px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Logical ID (Profile)</label>
+                        <input
+                          type="text"
+                          value={(selectedNode.data?.config as any)?.logical_id || ""}
+                          onChange={(e) => updateConfig("logical_id", e.target.value)}
+                          placeholder="e.g. submit_btn"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono text-[11px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Retries</label>
+                        <select
+                          value={(selectedNode.data?.config as any)?.retry_count ?? 0}
+                          onChange={(e) => updateConfig("retry_count", Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-[11px]"
+                        >
+                          <option value={0}>0 (No retry)</option>
+                          <option value={1}>1 Retry</option>
+                          <option value={2}>2 Retries</option>
+                          <option value={3}>3 Retries</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "press_key" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Key / Shortcut *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.key || "Enter"}
+                        onChange={(e) => updateConfig("key", e.target.value)}
+                        placeholder="Enter, Tab, Escape, Control+a"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "keyboard_type" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Text to Type *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.text || ""}
+                        onChange={(e) => updateConfig("text", e.target.value)}
+                        placeholder="Real keystroke input"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "drag_and_drop" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Source Selector *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.source_selector || ""}
+                        onChange={(e) => updateConfig("source_selector", e.target.value)}
+                        placeholder="#card-1, [data-draggable]"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Destination Selector *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.destination_selector || ""}
+                        onChange={(e) => updateConfig("destination_selector", e.target.value)}
+                        placeholder="#column-done, [data-droppable]"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "upload_file" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">File Input Selector *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.selector || ""}
+                        onChange={(e) => updateConfig("selector", e.target.value)}
+                        placeholder="input[type='file'], #avatar-upload"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">File Paths (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={((selectedNode.data?.config as any)?.files || []).join(", ")}
+                        onChange={(e) => updateConfig("files", e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean))}
+                        placeholder="/path/to/invoice.pdf, /path/to/doc.png"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono text-[11px]"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "evaluate_js" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">JavaScript Code *</label>
+                      <textarea
+                        rows={3}
+                        value={(selectedNode.data?.config as any)?.script || ""}
+                        onChange={(e) => updateConfig("script", e.target.value)}
+                        placeholder="return document.querySelector('.price')?.innerText;"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Store in Variable</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.variable_name || ""}
+                        onChange={(e) => updateConfig("variable_name", e.target.value)}
+                        placeholder="e.g. page_title"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "wait_for_element" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Selector *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.selector || ""}
+                        onChange={(e) => updateConfig("selector", e.target.value)}
+                        placeholder="#submit-btn, .modal"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Desired State</label>
                       <select
-                        value={(selectedNode.data?.config as any)?.recognition_strategy || "deterministic_multi_factor"}
-                        onChange={(e) => updateConfig("recognition_strategy", e.target.value)}
+                        value={(selectedNode.data?.config as any)?.state || "visible"}
+                        onChange={(e) => updateConfig("state", e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                       >
-                        <option value="deterministic_multi_factor">Deterministic Multi-Factor (Levenshtein + ARIA)</option>
-                        <option value="role_accessible_name">ARIA Role & Accessible Name</option>
-                        <option value="stable_attribute">Stable ID / Data-Testid</option>
-                        <option value="structural_xpath">Structural Fingerprint</option>
+                        <option value="visible">Visible</option>
+                        <option value="clickable">Clickable (Visible + Enabled + Stable)</option>
+                        <option value="hidden">Hidden / Detached</option>
+                        <option value="present">Present in DOM</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.timeout_ms || 10000}
+                        onChange={(e) => updateConfig("timeout_ms", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "wait_for_url" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">URL Pattern / Substring *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.url_pattern || ""}
+                        onChange={(e) => updateConfig("url_pattern", e.target.value)}
+                        placeholder="/dashboard or https://app.corp.internal/success"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="regex_toggle"
+                        checked={Boolean((selectedNode.data?.config as any)?.is_regex)}
+                        onChange={(e) => updateConfig("is_regex", e.target.checked)}
+                        className="rounded border-slate-300"
+                      />
+                      <label htmlFor="regex_toggle" className="text-slate-700 dark:text-slate-300 text-xs">Regular Expression pattern</label>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.timeout_ms || 10000}
+                        onChange={(e) => updateConfig("timeout_ms", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "wait_for_text" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Container Selector</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.selector || "body"}
+                        onChange={(e) => updateConfig("selector", e.target.value)}
+                        placeholder="body, #alert-box, .status"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Expected Text *</label>
+                      <input
+                        type="text"
+                        value={(selectedNode.data?.config as any)?.text || ""}
+                        onChange={(e) => updateConfig("text", e.target.value)}
+                        placeholder="Operation Successful"
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="exact_text_toggle"
+                        checked={Boolean((selectedNode.data?.config as any)?.exact)}
+                        onChange={(e) => updateConfig("exact", e.target.checked)}
+                        className="rounded border-slate-300"
+                      />
+                      <label htmlFor="exact_text_toggle" className="text-slate-700 dark:text-slate-300 text-xs">Exact match</label>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.timeout_ms || 10000}
+                        onChange={(e) => updateConfig("timeout_ms", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedNode.data?.action === "wait_for_network_idle" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Timeout (ms)</label>
+                      <input
+                        type="number"
+                        value={(selectedNode.data?.config as any)?.timeout_ms || 10000}
+                        onChange={(e) => updateConfig("timeout_ms", Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
                     </div>
                   </div>
                 )}

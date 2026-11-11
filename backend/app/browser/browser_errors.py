@@ -76,13 +76,13 @@ class BrowserCommandError(AgentBrowserError):
 
     def __init__(
         self,
-        command: list[str],
-        returncode: int,
+        command: list[str] | str = "agent-browser",
+        returncode: int = 1,
         stdout: str = "",
         stderr: str = "",
         session_id: str | None = None,
     ) -> None:
-        cmd_str = " ".join(command)
+        cmd_str = " ".join(command) if isinstance(command, list) else str(command)
         err_excerpt = (stderr.strip() or stdout.strip() or "Unknown CLI error")[:400]
         message = f"Agent Browser command failed (exit code {returncode}): {cmd_str}\nError: {err_excerpt}"
         super().__init__(
@@ -95,7 +95,7 @@ class BrowserCommandError(AgentBrowserError):
                 "stderr": stderr,
             },
         )
-        self.command = command
+        self.command = command if isinstance(command, list) else [str(command)]
         self.returncode = returncode
         self.stdout = stdout
         self.stderr = stderr
@@ -107,13 +107,14 @@ class ElementNotFoundError(BrowserCommandError):
     def __init__(
         self,
         selector: str,
-        command: list[str],
+        command: list[str] | str | None = None,
         returncode: int = 1,
         stdout: str = "",
         stderr: str = "",
         session_id: str | None = None,
     ) -> None:
-        super().__init__(command, returncode, stdout, stderr, session_id=session_id)
+        cmd = command if command is not None else ["find", selector]
+        super().__init__(command=cmd, returncode=returncode, stdout=stdout, stderr=stderr, session_id=session_id)
         self.selector = selector
         self.message = f"Element not found or ambiguous for selector: '{selector}'"
         self.details["selector"] = selector

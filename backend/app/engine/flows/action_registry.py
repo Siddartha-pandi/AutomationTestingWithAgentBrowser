@@ -20,6 +20,16 @@ from backend.app.browser.browser_errors import BrowserCommandError, ElementNotFo
 BrowserActionError = BrowserCommandError
 from backend.app.engine.flows.flow_schema import FlowActionType
 from backend.app.engine.flows.variable_scope import VariableScope
+from backend.app.engine.retry import BackoffStrategy, RetryConfig, RetryExecutor
+from backend.app.engine.selectors import (
+    ParsedSelector,
+    ResolvedSelectorResult,
+    SelectorFallbackResolver,
+    SelectorType,
+    parse_selector,
+    validate_selector,
+)
+from backend.app.engine.waits import WaitConditionResult, WaitEngine
 from backend.app.intelligence.element_profile import ElementProfileData
 from backend.app.intelligence.self_healing import SelfHealingEngine
 from backend.app.models.intelligence import ElementProfile
@@ -37,6 +47,11 @@ class StepExecutionResult:
     next_handle: str = "default"  # 'default', 'true', 'false', 'loop_body', 'loop_exit'
     screenshot_path: str | None = None
     healed_locator: str | None = None
+    duration_ms: float = 0.0
+    actual_selector: str | None = None
+    fallback_tier: str | None = None
+    retries_attempted: int = 1
+    console_logs: list[str] = field(default_factory=list)
 
 
 class ActionRegistry:
@@ -46,6 +61,9 @@ class ActionRegistry:
         self.adapter = adapter
         self.db = db
         self.healing_engine = SelfHealingEngine(adapter, db=db)
+        self.selector_resolver = SelectorFallbackResolver(adapter, db=db)
+        self.wait_engine = WaitEngine(adapter)
+        self.retry_executor = RetryExecutor(adapter)
 
     def resolve_target_selector(
         self,
@@ -55,94 +73,31 @@ class ActionRegistry:
         execution_id: UUID | None = None,
         is_destructive: bool = False,
     ) -> tuple[str, str | None]:
-        """Resolves resilient locator using element profiles and deterministic self-healing if needed.
+        """Resolves resilient locator using element profiles, multi-tier fallback, and deterministic self-healing.
 
         Returns (resolved_selector, healed_locator_or_None).
         """
         logical_id = target_config.get("logical_id")
         element_profile_id = target_config.get("element_profile_id")
         raw_selector = target_config.get("selector") or ""
+        fallbacks = target_config.get("fallbacks") or []
 
-        # 1. Direct selector test if no profile configured
-        if not logical_id and not element_profile_id:
-            if not raw_selector:
-                raise ElementNotFoundError("No target selector or logical ID specified in action config")
-            return raw_selector, None
+        if not logical_id and not element_profile_id and not raw_selector:
+            raise ElementNotFoundError("No target selector or logical ID specified in action config")
 
-        # 2. Look up element profile from database if available
-        profile_record: ElementProfile | None = None
-        if self.db:
-            if element_profile_id:
-                try:
-                    profile_uuid = UUID(str(element_profile_id))
-                    profile_record = self.db.query(ElementProfile).filter(ElementProfile.id == profile_uuid).first()
-                except ValueError:
-                    pass
-            elif logical_id:
-                profile_record = self.db.query(ElementProfile).filter(ElementProfile.logical_id == logical_id).first()
+        # Multi-tier resolution through selector subsystem
+        resolution = self.selector_resolver.resolve(
+            session_id=session_id,
+            primary_selector=raw_selector,
+            configured_fallbacks=fallbacks,
+            logical_id=logical_id,
+            element_profile_id=element_profile_id,
+            execution_id=execution_id,
+            is_destructive=is_destructive,
+        )
 
-        # If profile found, attempt preferred / historical locators first
-        active_selector = raw_selector
-        if profile_record and profile_record.history:
-            # Try top verified selector
-            top_historical = profile_record.history[0].locator_value
-            if self.adapter.is_visible(session_id, top_historical):
-                return top_historical, None
-
-        if active_selector and self.adapter.is_visible(session_id, active_selector):
-            return active_selector, None
-
-        # 3. If selector is not visible or changed, trigger Deterministic Self-Healing!
-        if profile_record:
-            logger.info("Target selector '%s' not visible. Initiating deterministic self-healing...", active_selector)
-            history_list = [
-                {"locator_type": h.locator_type, "locator_value": h.locator_value, "success_count": h.success_count}
-                for h in profile_record.history
-            ]
-            profile_data = ElementProfileData(
-                logical_id=profile_record.logical_id,
-                description=profile_record.description or "",
-                element_type=profile_record.element_type,
-                page_context=profile_record.page_context,
-                original_text=profile_record.original_text,
-                role=profile_record.structural_fingerprint.get("role") if profile_record.structural_fingerprint else None,
-                accessible_name=profile_record.structural_fingerprint.get("accessible_name") if profile_record.structural_fingerprint else None,
-                stable_attributes=profile_record.stable_attributes or {},
-                structural_fingerprint=profile_record.structural_fingerprint or {},
-                historical_locators=history_list,
-            )
-
-            heal_result = self.healing_engine.resolve_element(
-                session_id=session_id,
-                profile=profile_data,
-                original_locator=active_selector or profile_record.logical_id,
-                action=action_name,
-                is_destructive=is_destructive,
-                execution_id=execution_id,
-                element_profile_id=profile_record.id,
-            )
-
-            if heal_result.success and heal_result.healed_locator:
-                logger.info(
-                    "Deterministic self-healing recovered element with locator '%s' (Confidence: %.1f%%)",
-                    heal_result.healed_locator,
-                    heal_result.confidence_score * 100.0,
-                )
-                return heal_result.healed_locator, heal_result.healed_locator
-            elif heal_result.decision == "requires_approval":
-                raise BrowserActionError(
-                    f"Self-healing confidence score ({heal_result.confidence_score*100:.1f}%) requires human approval before executing action."
-                )
-            else:
-                raise ElementNotFoundError(
-                    f"Deterministic element recognition failed: {heal_result.error_message}"
-                )
-
-        if not active_selector:
-            raise ElementNotFoundError(f"Element '{logical_id}' could not be resolved on current page")
-
-        return active_selector, None
-
+        healed = resolution.resolved_selector if resolution.healed else None
+        return resolution.resolved_selector, healed
     def execute_action(
         self,
         action: FlowActionType,
@@ -151,7 +106,7 @@ class ActionRegistry:
         scope: VariableScope,
         execution_id: UUID | None = None,
     ) -> StepExecutionResult:
-        """Dispatches action execution deterministically."""
+        """Dispatches action execution deterministically with timing, retries, and error telemetry."""
         handler_map: dict[FlowActionType, Callable[..., StepExecutionResult]] = {
             FlowActionType.NAVIGATE: self._handle_navigate,
             FlowActionType.CLICK: self._handle_click,
@@ -164,11 +119,23 @@ class ActionRegistry:
             FlowActionType.CHECK: self._handle_check,
             FlowActionType.UNCHECK: self._handle_uncheck,
             FlowActionType.SCROLL: self._handle_scroll,
+            FlowActionType.SCROLL_INTO_VIEW: self._handle_scroll_into_view,
+            FlowActionType.PRESS_KEY: self._handle_press_key,
+            FlowActionType.KEYBOARD_TYPE: self._handle_keyboard_type,
+            FlowActionType.FOCUS: self._handle_focus,
+            FlowActionType.CLEAR: self._handle_clear,
+            FlowActionType.DRAG_AND_DROP: self._handle_drag_and_drop,
+            FlowActionType.UPLOAD_FILE: self._handle_upload_file,
+            FlowActionType.EVALUATE_JS: self._handle_evaluate_js,
             FlowActionType.EXTRACT_TEXT: self._handle_extract_text,
             FlowActionType.EXTRACT_ATTRIBUTE: self._handle_extract_attribute,
             FlowActionType.EXTRACT_TABLE: self._handle_extract_table,
             FlowActionType.WAIT: self._handle_wait,
             FlowActionType.WAIT_UNTIL: self._handle_wait_until,
+            FlowActionType.WAIT_FOR_ELEMENT: self._handle_wait_for_element,
+            FlowActionType.WAIT_FOR_URL: self._handle_wait_for_url,
+            FlowActionType.WAIT_FOR_TEXT: self._handle_wait_for_text,
+            FlowActionType.WAIT_FOR_NETWORK_IDLE: self._handle_wait_for_network_idle,
             FlowActionType.BROWSER_BACK: self._handle_browser_back,
             FlowActionType.BROWSER_FORWARD: self._handle_browser_forward,
             FlowActionType.REFRESH: self._handle_refresh,
@@ -191,11 +158,49 @@ class ActionRegistry:
                 error_message=f"No handler registered for action '{action.value}'",
             )
 
-        try:
+        retries = int(config.get("retries", config.get("retry_count", 0)))
+        start_t = time.perf_counter()
+
+        def run_op() -> StepExecutionResult:
             return handler(session_id, config, scope, execution_id)
+
+        try:
+            if retries > 0:
+                retry_cfg = RetryConfig(
+                    max_retries=retries,
+                    initial_delay_sec=float(config.get("retry_delay_sec", 0.5)),
+                )
+                outcome = self.retry_executor.execute_with_retry(
+                    session_id=session_id,
+                    action_fn=run_op,
+                    config=retry_cfg,
+                    action_name=action.value,
+                )
+                if outcome.success and isinstance(outcome.result, StepExecutionResult):
+                    res = outcome.result
+                    res.retries_attempted = outcome.attempts
+                    res.duration_ms = outcome.total_elapsed_ms
+                    return res
+                elif outcome.last_error:
+                    raise outcome.last_error
+
+            res = run_op()
+            res.duration_ms = round((time.perf_counter() - start_t) * 1000.0, 2)
+            return res
         except Exception as err:
             logger.error("Error executing action '%s': %s", action.value, err)
-            return StepExecutionResult(status="failed", error_message=str(err))
+            duration_ms = round((time.perf_counter() - start_t) * 1000.0, 2)
+            c_logs: list[str] = []
+            try:
+                c_logs = self.adapter.get_console_logs(session_id)
+            except Exception:
+                pass
+            return StepExecutionResult(
+                status="failed",
+                error_message=str(err),
+                duration_ms=duration_ms,
+                console_logs=c_logs,
+            )
 
     def _handle_navigate(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
@@ -418,6 +423,140 @@ class ActionRegistry:
         res = self.adapter.scroll(session_id, direction=direction, amount=amount, selector=selector)
         return StepExecutionResult(status="passed", result_data={"direction": direction, "amount": amount, "target": selector})
 
+    def _handle_scroll_into_view(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="scroll_into_view", execution_id=execution_id)
+        self.adapter.scroll_into_view(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "scrolled_into_view": True}, healed_locator=healed_loc)
+
+    def _handle_press_key(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        raw_key = config.get("key", "Enter")
+        key = str(scope.interpolate(raw_key))
+        self.adapter.press_key(session_id, key=key)
+        return StepExecutionResult(status="passed", result_data={"key": key, "pressed": True})
+
+    def _handle_keyboard_type(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        raw_text = config.get("text", "")
+        text = str(scope.interpolate(raw_text))
+        self.adapter.keyboard_type(session_id, text=text)
+        return StepExecutionResult(status="passed", result_data={"text_length": len(text), "keyboard_typed": True})
+
+    def _handle_focus(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="focus", execution_id=execution_id)
+        self.adapter.focus(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "focused": True}, healed_locator=healed_loc)
+
+    def _handle_clear(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="clear", execution_id=execution_id)
+        self.adapter.clear(session_id, selector=selector)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "cleared": True}, healed_locator=healed_loc)
+
+    def _handle_drag_and_drop(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        source_target = config.get("source") or config.get("source_target") or {}
+        dest_target = config.get("destination") or config.get("destination_target") or {}
+        src_sel, _ = self.resolve_target_selector(session_id, source_target, action_name="drag_source", execution_id=execution_id)
+        dst_sel, _ = self.resolve_target_selector(session_id, dest_target, action_name="drag_target", execution_id=execution_id)
+        self.adapter.drag_and_drop(session_id, source_selector=src_sel, target_selector=dst_sel)
+        return StepExecutionResult(status="passed", result_data={"source": src_sel, "destination": dst_sel, "dragged": True})
+
+    def _handle_upload_file(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        raw_files = config.get("files") or [config.get("file_path")]
+        file_paths = [str(scope.interpolate(f)) for f in raw_files if f]
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="upload", execution_id=execution_id)
+        self.adapter.upload(session_id, selector=selector, file_paths=file_paths)
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "files": file_paths, "uploaded": True}, healed_locator=healed_loc)
+
+    def _handle_evaluate_js(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        raw_script = str(config.get("script") or config.get("expression") or "")
+        script = str(scope.interpolate(raw_script))
+        var_name = config.get("variable_name")
+        res = self.adapter.evaluate(session_id, js_code=script)
+        if var_name:
+            scope.set(var_name, res)
+        return StepExecutionResult(status="passed", result_data={"variable_name": var_name, "result": res})
+
+    def _handle_wait_for_element(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        state = config.get("state", "visible")  # 'visible', 'hidden', 'present', 'clickable'
+        timeout_ms = int(config.get("timeout_ms", 10000))
+        raw_sel = target.get("selector") or ""
+        selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="wait_for_element", execution_id=execution_id) if raw_sel else ("", None)
+
+        if state == "clickable":
+            w_res = self.wait_engine.wait_for_element_clickable(session_id, selector, timeout_ms=timeout_ms)
+        elif state == "hidden":
+            w_res = self.wait_engine.wait_for_element_hidden(session_id, selector, timeout_ms=timeout_ms)
+        elif state == "present":
+            w_res = self.wait_engine.wait_for_element_present(session_id, selector, timeout_ms=timeout_ms)
+        else:
+            w_res = self.wait_engine.wait_for_element_visible(session_id, selector, timeout_ms=timeout_ms)
+
+        if not w_res.satisfied:
+            raise BrowserActionError(w_res.details or f"Wait for element '{selector}' in state '{state}' timed out")
+
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "state": state, "elapsed_ms": w_res.elapsed_ms}, healed_locator=healed_loc)
+
+    def _handle_wait_for_url(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        raw_pattern = config.get("url_pattern", "")
+        pattern = str(scope.interpolate(raw_pattern))
+        is_regex = bool(config.get("is_regex", False))
+        timeout_ms = int(config.get("timeout_ms", 10000))
+
+        w_res = self.wait_engine.wait_for_url(session_id, expected_pattern=pattern, is_regex=is_regex, timeout_ms=timeout_ms)
+        if not w_res.satisfied:
+            raise BrowserActionError(w_res.details or f"Wait for URL matching '{pattern}' timed out")
+
+        return StepExecutionResult(status="passed", result_data={"pattern": pattern, "is_regex": is_regex, "elapsed_ms": w_res.elapsed_ms})
+
+    def _handle_wait_for_text(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        target = config.get("target") or {}
+        selector = target.get("selector") or "body"
+        raw_text = config.get("text", "")
+        text = str(scope.interpolate(raw_text))
+        exact = bool(config.get("exact", False))
+        timeout_ms = int(config.get("timeout_ms", 10000))
+
+        w_res = self.wait_engine.wait_for_text(session_id, selector=selector, expected_text=text, exact=exact, timeout_ms=timeout_ms)
+        if not w_res.satisfied:
+            raise BrowserActionError(w_res.details or f"Wait for text '{text}' on selector '{selector}' timed out")
+
+        return StepExecutionResult(status="passed", result_data={"selector": selector, "text": text, "exact": exact, "elapsed_ms": w_res.elapsed_ms})
+
+    def _handle_wait_for_network_idle(
+        self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
+    ) -> StepExecutionResult:
+        timeout_ms = int(config.get("timeout_ms", 10000))
+        w_res = self.wait_engine.wait_for_network_idle(session_id, timeout_ms=timeout_ms)
+        if not w_res.satisfied:
+            raise BrowserActionError(w_res.details or "Wait for network idle timed out")
+
+        return StepExecutionResult(status="passed", result_data={"network_idle": True, "elapsed_ms": w_res.elapsed_ms})
+
     def _handle_browser_back(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
     ) -> StepExecutionResult:
@@ -444,25 +583,26 @@ class ActionRegistry:
         timeout_ms = int(config.get("timeout_ms", 10000))
         condition_type = config.get("condition", "visible")
 
-        start = time.time()
-        deadline = start + (timeout_ms / 1000.0)
-        matched = False
-        while time.time() < deadline:
-            if condition_type == "visible" and self.adapter.is_visible(session_id, raw_selector):
-                matched = True
-                break
-            elif condition_type == "hidden" and not self.adapter.is_visible(session_id, raw_selector):
-                matched = True
-                break
-            elif condition_type == "enabled" and self.adapter.is_enabled(session_id, raw_selector):
-                matched = True
-                break
-            time.sleep(0.5)
+        if condition_type == "visible":
+            w_res = self.wait_engine.wait_for_element_visible(session_id, raw_selector, timeout_ms=timeout_ms)
+        elif condition_type == "hidden":
+            w_res = self.wait_engine.wait_for_element_hidden(session_id, raw_selector, timeout_ms=timeout_ms)
+        elif condition_type == "clickable":
+            w_res = self.wait_engine.wait_for_element_clickable(session_id, raw_selector, timeout_ms=timeout_ms)
+        elif condition_type == "present":
+            w_res = self.wait_engine.wait_for_element_present(session_id, raw_selector, timeout_ms=timeout_ms)
+        else:
+            w_res = self.wait_engine.poll_condition(
+                condition_fn=lambda: self.adapter.is_enabled(session_id, raw_selector),
+                condition_name="enabled",
+                target=raw_selector,
+                timeout_ms=timeout_ms,
+            )
 
-        if not matched:
+        if not w_res.satisfied:
             raise BrowserActionError(f"Wait until condition '{condition_type}' timed out on selector '{raw_selector}'")
 
-        return StepExecutionResult(status="passed", result_data={"selector": raw_selector, "matched": True})
+        return StepExecutionResult(status="passed", result_data={"selector": raw_selector, "matched": True, "elapsed_ms": w_res.elapsed_ms})
 
     def _handle_switch(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None

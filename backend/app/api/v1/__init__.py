@@ -21,6 +21,7 @@ from backend.app.api.v1.schedules import router as schedules_router
 from backend.app.api.v1.test_suites import router as test_suites_router
 from backend.app.api.v1.tests import router as tests_router
 from backend.app.api.v1.users import router as users_router
+from backend.app.api.v1.ws_monitor import router as ws_monitor_router
 
 api_v1_router = APIRouter(prefix="/api/v1")
 
@@ -47,8 +48,9 @@ api_v1_router.include_router(dom_router)
 api_v1_router.include_router(elements_router)
 api_v1_router.include_router(healing_router)
 
-# Executions, Artifacts, Reports & Audit
+# Executions, Artifacts, Reports, WebSocket & Audit
 api_v1_router.include_router(executions_router)
+api_v1_router.include_router(ws_monitor_router)
 api_v1_router.include_router(artifacts_router)
 api_v1_router.include_router(reports_router)
 api_v1_router.include_router(audit_router)
