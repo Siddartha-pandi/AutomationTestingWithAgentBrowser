@@ -97,6 +97,14 @@ class ActionRegistry:
         )
 
         healed = resolution.resolved_selector if resolution.healed else None
+        logger.info(
+            "Selector resolution for action '%s': original='%s', resolved='%s' (tier: %s), attempted=%s",
+            action_name,
+            raw_selector,
+            resolution.resolved_selector,
+            resolution.tier,
+            resolution.attempted_selectors,
+        )
         return resolution.resolved_selector, healed
     def execute_action(
         self,
@@ -231,10 +239,8 @@ class ActionRegistry:
     ) -> StepExecutionResult:
         target = config.get("target") or {}
         selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="double_click", execution_id=execution_id)
-        # Double click via double dispatch
-        self.adapter.click(session_id, selector=selector)
-        time.sleep(0.1)
-        self.adapter.click(session_id, selector=selector)
+        # Double click via native Agent Browser CLI command
+        self.adapter.dblclick(session_id, selector=selector)
         return StepExecutionResult(status="passed", result_data={"selector": selector}, healed_locator=healed_loc)
 
     def _handle_fill(

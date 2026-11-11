@@ -137,10 +137,11 @@ def test_network_policy_cloud_metadata_protection():
     allowed, err = validate_destination_url("http://127.0.0.1:8080/admin", allow_loopback=False)
     assert not allowed
 
-    # Allowed domain
+    # Allowed domain (offline test mode with fail_closed_dns=False)
     allowed, msg = validate_destination_url(
         "https://example.com/login",
         allowed_domains=["*.example.com", "example.com"],
+        fail_closed_dns=False,
     )
     assert allowed
     assert "allowed" in msg.lower()

@@ -16,6 +16,7 @@ import {
   Layers,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
@@ -67,6 +68,24 @@ export function ExecutionHistoryPage({ projectId, onNavigate, onSelectExecution 
       onConfirm: () => {
         info("Rerun Dispatched", `Started background worker for ${exec.name}.`);
         onNavigate("executions_running");
+      },
+    });
+  };
+
+  const handleDeleteExecution = (exec: any) => {
+    confirm({
+      title: "Delete Execution Record",
+      message: `Permanently delete execution run record for '${exec.name}' (Run ID: ${exec.id})? Associated telemetry and run reports will be deleted.`,
+      confirmText: "Delete Record",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await executionsApi.delete(exec.id);
+        } catch {
+          // Fallback optimistic
+        }
+        setExecutions((prev) => prev.filter((e) => e.id !== exec.id));
+        success("Execution Record Deleted", `Removed run ${exec.id}.`);
       },
     });
   };
@@ -252,6 +271,14 @@ export function ExecutionHistoryPage({ projectId, onNavigate, onSelectExecution 
                         className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[#2563EB] dark:text-blue-400 transition"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteExecution(exec)}
+                        title="Delete Execution Record"
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>

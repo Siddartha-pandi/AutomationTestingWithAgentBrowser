@@ -94,6 +94,8 @@ export const flowsApi = {
     request<any>("/api/v1/flows/validate", { method: "POST", body: { definition } }),
   execute: (id: string, data?: { version_id?: string; initial_variables?: Record<string, any> }) =>
     request<any>(`/api/v1/flows/${id}/execute`, { method: "POST", body: data || {} }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/flows/${id}`, { method: "DELETE" }),
 };
 
 // 3. Tests & Suites
@@ -106,6 +108,7 @@ export const testsApi = {
   update: (id: string, data: { name?: string; description?: string; test_case?: any }) =>
     request<any>(`/api/v1/tests/${id}`, { method: "PUT", body: data }),
   publish: (id: string) => request<any>(`/api/v1/tests/${id}/publish`, { method: "POST" }),
+  delete: (id: string) => request<void>(`/api/v1/tests/${id}`, { method: "DELETE" }),
   execute: (id: string, data?: { test_data_row?: Record<string, any> }) =>
     request<any>(`/api/v1/tests/${id}/execute`, { method: "POST", body: data || {} }),
   seedLegacy: (projectId: string) =>
@@ -114,6 +117,8 @@ export const testsApi = {
     request<any[]>(`/api/v1/tests/datasets${projectId ? `?project_id=${projectId}` : ""}`),
   createDataset: (data: { project_id: string; name: string; description?: string; format?: string; headers: string[]; rows: any[] }) =>
     request<any>("/api/v1/tests/datasets", { method: "POST", body: data }),
+  updateDataset: (id: string, data: { name?: string; description?: string; format?: string; headers?: string[]; rows?: any[] }) =>
+    request<any>(`/api/v1/tests/datasets/${id}`, { method: "PUT", body: data }),
   deleteDataset: (id: string) =>
     request<void>(`/api/v1/tests/datasets/${id}`, { method: "DELETE" }),
 };
@@ -124,6 +129,10 @@ export const testSuitesApi = {
   get: (id: string) => request<any>(`/api/v1/test-suites/${id}`),
   create: (data: { project_id: string; name: string; description?: string; test_suite: any }) =>
     request<any>("/api/v1/test-suites", { method: "POST", body: data }),
+  update: (id: string, data: { name?: string; description?: string; test_suite?: any }) =>
+    request<any>(`/api/v1/test-suites/${id}`, { method: "PUT", body: data }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/test-suites/${id}`, { method: "DELETE" }),
   execute: (id: string) =>
     request<any>(`/api/v1/test-suites/${id}/execute`, { method: "POST", body: {} }),
 };
@@ -139,6 +148,7 @@ export const executionsApi = {
   },
   get: (id: string) => request<any>(`/api/v1/executions/${id}`),
   cancel: (id: string) => request<any>(`/api/v1/executions/${id}/cancel`, { method: "POST" }),
+  delete: (id: string) => request<void>(`/api/v1/executions/${id}`, { method: "DELETE" }),
   getReport: (id: string) => request<any>(`/api/v1/executions/${id}/report`),
   getLogs: (id: string, filters?: { level?: string; search?: string; limit?: number; offset?: number }) => {
     const params = new URLSearchParams();
@@ -163,6 +173,10 @@ export const intelligenceApi = {
     request<any[]>(`/api/v1/elements?project_id=${projectId}`),
   createElement: (data: any) =>
     request<any>("/api/v1/elements", { method: "POST", body: data }),
+  updateElement: (id: string, data: any) =>
+    request<any>(`/api/v1/elements/${id}`, { method: "PUT", body: data }),
+  deleteElement: (id: string) =>
+    request<void>(`/api/v1/elements/${id}`, { method: "DELETE" }),
   getElement: (id: string) =>
     request<any>(`/api/v1/elements/${id}`),
   listHealingEvents: () =>
@@ -182,6 +196,10 @@ export const projectsApi = {
   get: (id: string) => request<any>(`/api/v1/projects/${id}`),
   create: (data: { name: string; description?: string }) =>
     request<any>("/api/v1/projects", { method: "POST", body: data }),
+  update: (id: string, data: { name?: string; description?: string }) =>
+    request<any>(`/api/v1/projects/${id}`, { method: "PUT", body: data }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/projects/${id}`, { method: "DELETE" }),
   listMembers: (projectId: string) =>
     request<any[]>(`/api/v1/projects/${projectId}/members`),
   addMember: (projectId: string, data: { user_id: string; role: string }) =>
@@ -260,6 +278,10 @@ export const schedulesApi = {
     request<any[]>(`/api/v1/schedules${projectId ? `?project_id=${projectId}` : ""}`),
   create: (data: any) =>
     request<any>("/api/v1/schedules", { method: "POST", body: data }),
+  update: (id: string, data: any) =>
+    request<any>(`/api/v1/schedules/${id}`, { method: "PUT", body: data }),
+  delete: (id: string) =>
+    request<void>(`/api/v1/schedules/${id}`, { method: "DELETE" }),
 };
 
 // 9. Reports & Analytics
@@ -273,6 +295,10 @@ export const reportsApi = {
 // 10. Administration & Audit
 export const adminApi = {
   listUsers: () => request<any[]>("/api/v1/users"),
+  updateUser: (id: string, data: { full_name?: string; role?: string; is_active?: boolean }) =>
+    request<any>(`/api/v1/users/${id}`, { method: "PUT", body: data }),
+  deleteUser: (id: string) =>
+    request<void>(`/api/v1/users/${id}`, { method: "DELETE" }),
   listRoles: () => request<any[]>("/api/v1/roles"),
   listAuditLogs: (filters?: { limit?: number; action?: string; resource_type?: string }) => {
     const params = new URLSearchParams();

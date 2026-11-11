@@ -220,8 +220,16 @@ export function ScreenshotsGalleryPage({ projectId, onNavigate }: ScreenshotsGal
                       <button
                         onClick={() => handleDownload(sc)}
                         className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                        title="Download"
                       >
                         <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(sc)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 transition"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>
@@ -254,13 +262,26 @@ export function ScreenshotsGalleryPage({ projectId, onNavigate }: ScreenshotsGal
             <img src={selectedScreenshot.url} alt={selectedScreenshot.name} className="w-full max-h-[70vh] object-contain rounded-lg" />
             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800 font-mono">
               <span>{selectedScreenshot.step_name} • {selectedScreenshot.environment}</span>
-              <button
-                onClick={() => handleDownload(selectedScreenshot)}
-                className="px-3 py-1 rounded-lg bg-blue-600 text-white font-semibold flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Download</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const toDelete = selectedScreenshot;
+                    setSelectedScreenshot(null);
+                    handleDelete(toDelete);
+                  }}
+                  className="px-3 py-1 rounded-lg border border-rose-500/30 hover:bg-rose-500/20 text-rose-400 font-semibold flex items-center gap-1.5 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
+                </button>
+                <button
+                  onClick={() => handleDownload(selectedScreenshot)}
+                  className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

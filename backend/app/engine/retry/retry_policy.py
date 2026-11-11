@@ -3,8 +3,8 @@
 Guarantees:
 - Safe retry execution with linear, exponential, or fixed backoff
 - Pre-retry verification preventing duplicate submissions or side effects
-- Stale element detection and automatic fallback selector recovery
-- Strict non-retryable error classification (e.g. security violations, syntax errors)
+- Safe handling of irreversible / non-idempotent actions
+- Strict non-retryable error classification (e.g. security violations, permissions, syntax errors)
 Zero AI models or heuristics.
 """
 
@@ -23,6 +23,7 @@ from backend.app.browser.browser_errors import (
     BrowserTimeoutError,
     ElementNotFoundError,
     NavigationSecurityError,
+    SessionIsolationError,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,12 +39,14 @@ class BackoffStrategy(str, Enum):
     EXPONENTIAL = "exponential"
 
 
-# Non-retryable error classes that should fail fast
+# Non-retryable error classes that must fail fast immediately
 NON_RETRYABLE_EXCEPTIONS = (
     NavigationSecurityError,
     BrowserNotFoundError,
+    SessionIsolationError,
     ValueError,
     TypeError,
+    PermissionError,
 )
 
 
@@ -59,6 +62,8 @@ class RetryConfig:
     expected_state_type: str | None = None
     expected_state_target: str | None = None
     expected_state_val: Any = None
+    is_idempotent: bool = True
+    is_irreversible: bool = False
 
 
 @dataclass
@@ -117,43 +122,96 @@ class RetryExecutor:
                 )
             except Exception as err:
                 last_error = err
-                # Fail fast on non-retryable errors
+
+                # 1. Fail fast on non-retryable errors
                 if isinstance(err, NON_RETRYABLE_EXCEPTIONS):
-                    logger.warning("Action '%s' failed with non-retryable error: %s", action_name, err)
+                    logger.warning(
+                        "Action '%s' failed with non-retryable error (%s): %s",
+                        action_name,
+                        type(err).__name__,
+                        err,
+                    )
+                    break
+
+                # 2. Prevent unsafe retries for irreversible actions
+                if config.is_irreversible or not config.is_idempotent:
+                    # Check if state verification is available
+                    if (
+                        config.verify_state_before_retry
+                        and config.expected_state_type
+                        and config.expected_state_target
+                    ):
+                        try:
+                            already_done = self.adapter.verify_state_before_retry(
+                                session_id=session_id,
+                                expected_type=config.expected_state_type,
+                                target=config.expected_state_target,
+                                expected_value=config.expected_state_val,
+                            )
+                            if already_done:
+                                logger.info(
+                                    "Irreversible action '%s' had error '%s' but state verification confirmed success.",
+                                    action_name,
+                                    err,
+                                )
+                                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                                return RetryOutcome(
+                                    success=True,
+                                    result=None,
+                                    attempts=attempt,
+                                    total_elapsed_ms=round(elapsed_ms, 2),
+                                    recovered_via_retry=True,
+                                    side_effect_prevented=True,
+                                )
+                        except Exception:
+                            pass
+                    # If state cannot be safely verified, abort retry
+                    logger.warning(
+                        "Action '%s' is irreversible/non-idempotent. Aborting retry to prevent duplicate side effects.",
+                        action_name,
+                    )
                     break
 
                 if attempt > config.max_retries:
-                    logger.warning("Action '%s' exhausted all %d retries. Last error: %s", action_name, config.max_retries, err)
+                    logger.warning(
+                        "Action '%s' exhausted all %d retries. Last error: %s",
+                        action_name,
+                        config.max_retries,
+                        err,
+                    )
                     break
 
-                # State verification check: did the action actually succeed despite timeout/error?
+                # 3. State verification check: did action actually succeed despite timeout/error?
                 if (
                     config.verify_state_before_retry
                     and config.expected_state_type
                     and config.expected_state_target
                 ):
-                    already_succeeded = self.adapter.verify_state_before_retry(
-                        session_id=session_id,
-                        expected_type=config.expected_state_type,
-                        target=config.expected_state_target,
-                        expected_value=config.expected_state_val,
-                    )
-                    if already_succeeded:
-                        logger.info(
-                            "Action '%s' had error '%s' but post-state '%s' is already satisfied. Avoiding duplicate retry.",
-                            action_name,
-                            err,
-                            config.expected_state_type,
+                    try:
+                        already_succeeded = self.adapter.verify_state_before_retry(
+                            session_id=session_id,
+                            expected_type=config.expected_state_type,
+                            target=config.expected_state_target,
+                            expected_value=config.expected_state_val,
                         )
-                        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-                        return RetryOutcome(
-                            success=True,
-                            result=None,
-                            attempts=attempt,
-                            total_elapsed_ms=round(elapsed_ms, 2),
-                            recovered_via_retry=True,
-                            side_effect_prevented=True,
-                        )
+                        if already_succeeded:
+                            logger.info(
+                                "Action '%s' had error '%s' but post-state '%s' is already satisfied. Avoiding duplicate retry.",
+                                action_name,
+                                err,
+                                config.expected_state_type,
+                            )
+                            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                            return RetryOutcome(
+                                success=True,
+                                result=None,
+                                attempts=attempt,
+                                total_elapsed_ms=round(elapsed_ms, 2),
+                                recovered_via_retry=True,
+                                side_effect_prevented=True,
+                            )
+                    except Exception:
+                        pass
 
                 delay = self.calculate_delay(attempt, config)
                 logger.info(
@@ -174,4 +232,3 @@ class RetryExecutor:
             total_elapsed_ms=round(elapsed_ms, 2),
             last_error=last_error,
         )
-

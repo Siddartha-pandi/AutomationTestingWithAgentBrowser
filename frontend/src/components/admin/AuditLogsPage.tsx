@@ -45,7 +45,7 @@ export function AuditLogsPage({ onNavigate }: AuditLogsPageProps) {
   const loadAuditLogs = async () => {
     setLoading(true);
     try {
-      const logs = await adminApi.listAuditLogs(100);
+      const logs = await adminApi.listAuditLogs({ limit: 100 });
       if (logs && logs.length > 0) {
         setAuditRecords(
           logs.map((item: any) => ({

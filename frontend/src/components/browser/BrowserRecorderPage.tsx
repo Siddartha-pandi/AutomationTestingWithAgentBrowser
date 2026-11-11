@@ -29,6 +29,7 @@ import {
   Crosshair,
   Layers,
   Search,
+  X,
 } from "lucide-react";
 import { recorderApi, browserApi, flowsApi, testsApi } from "@/api";
 import { useToast } from "../common/ToastProvider";
@@ -275,6 +276,37 @@ export function BrowserRecorderPage({
   // Delete recorded step
   const handleDeleteAction = (id: string) => {
     setRecordedActions((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  // Edit recorded step state & handler
+  const [editingAction, setEditingAction] = useState<RecordedAction | null>(null);
+  const [editActionType, setEditActionType] = useState("click");
+  const [editActionTarget, setEditActionTarget] = useState("");
+  const [editActionValue, setEditActionValue] = useState("");
+
+  const handleOpenEditAction = (act: RecordedAction) => {
+    setEditingAction(act);
+    setEditActionType(act.action);
+    setEditActionTarget(act.target);
+    setEditActionValue(act.value || "");
+  };
+
+  const handleSaveEditAction = () => {
+    if (!editingAction) return;
+    setRecordedActions((prev) =>
+      prev.map((a) =>
+        a.id === editingAction.id
+          ? {
+              ...a,
+              action: editActionType as any,
+              target: editActionTarget.trim(),
+              value: editActionValue.trim() || undefined,
+            }
+          : a
+      )
+    );
+    setEditingAction(null);
+    success("Step Updated", "Recorded action parameters modified.");
   };
 
   // Clear all steps
@@ -717,13 +749,22 @@ export function BrowserRecorderPage({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleDeleteAction(act.id)}
-                  className="p-1 text-slate-400 hover:text-rose-600 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  title="Remove step"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => handleOpenEditAction(act)}
+                    className="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer"
+                    title="Edit step"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAction(act.id)}
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
+                    title="Remove step"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -814,6 +855,93 @@ export function BrowserRecorderPage({
               >
                 {isLoading ? "Saving..." : "Save Definition"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Recorded Step Modal */}
+      {editingAction && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-[#161F30] rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-[#2563EB]" />
+                <span>Edit Recorded Step</span>
+              </h3>
+              <button
+                onClick={() => setEditingAction(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Action Type
+                </label>
+                <select
+                  value={editActionType}
+                  onChange={(e) => setEditActionType(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="click">click</option>
+                  <option value="fill">fill</option>
+                  <option value="navigate">navigate</option>
+                  <option value="hover">hover</option>
+                  <option value="select">select</option>
+                  <option value="check">check</option>
+                  <option value="press_enter">press_enter</option>
+                  <option value="wait">wait</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Target Selector / URL
+                </label>
+                <input
+                  type="text"
+                  value={editActionTarget}
+                  onChange={(e) => setEditActionTarget(e.target.value)}
+                  placeholder="e.g. #submit-btn or https://example.com"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              {(editActionType === "fill" || editActionType === "select") && (
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Value
+                  </label>
+                  <input
+                    type="text"
+                    value={editActionValue}
+                    onChange={(e) => setEditActionValue(e.target.value)}
+                    placeholder="Input or option value"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingAction(null)}
+                  className="px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEditAction}
+                  className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold shadow-xs"
+                >
+                  Save Step
+                </button>
+              </div>
             </div>
           </div>
         </div>

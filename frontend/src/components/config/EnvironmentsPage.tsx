@@ -71,6 +71,7 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
   };
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingEnv, setEditingEnv] = useState<EnvironmentItem | null>(null);
   const [nameInput, setNameInput] = useState("Custom Pre-Prod");
   const [urlInput, setUrlInput] = useState("https://preprod.company.internal");
   const [descInput, setDescInput] = useState("");
@@ -79,15 +80,78 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
   const { success, warning, info } = useToast();
   const { confirm } = useConfirm();
 
-  const handleCreateEnvironment = (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    setEditingEnv(null);
+    setNameInput("Custom Sandbox");
+    setUrlInput("https://sandbox.company.internal");
+    setDescInput("");
+    setIsProdInput(false);
+    setModalOpen(true);
+  };
+
+  const handleOpenEditModal = (env: EnvironmentItem) => {
+    setEditingEnv(env);
+    setNameInput(env.name);
+    setUrlInput(env.base_url);
+    setDescInput(env.description || "");
+    setIsProdInput(env.is_production);
+    setModalOpen(true);
+  };
+
+  const handleSaveEnvironment = async (e: React.FormEvent) => {
     e.preventDefault();
+    const domains = [urlInput.replace(/^https?:\/\//, "").split("/")[0]];
+
+    if (editingEnv) {
+      try {
+        await environmentsApi.update(editingEnv.id, {
+          name: nameInput.trim(),
+          base_url: urlInput.trim(),
+          allowed_domains: domains,
+        });
+      } catch {
+        // Optimistic update
+      }
+
+      setEnvironments(
+        environments.map((env) =>
+          env.id === editingEnv.id
+            ? {
+                ...env,
+                name: nameInput.trim(),
+                base_url: urlInput.trim(),
+                description: descInput.trim() || env.description,
+                status: isProdInput ? "guarded" : "healthy",
+                allowed_domains: domains,
+                is_production: isProdInput,
+              }
+            : env
+        )
+      );
+      setModalOpen(false);
+      setEditingEnv(null);
+      success("Environment Updated", `Updated '${nameInput}'.`);
+      return;
+    }
+
+    try {
+      await environmentsApi.create({
+        project_id: projectId,
+        name: nameInput.trim(),
+        base_url: urlInput.trim(),
+        allowed_domains: domains,
+      });
+    } catch {
+      // Optimistic
+    }
+
     const newEnv: EnvironmentItem = {
       id: `env-${Date.now()}`,
       name: nameInput.trim(),
       base_url: urlInput.trim(),
       description: descInput.trim() || "Custom environment configuration.",
       status: isProdInput ? "guarded" : "healthy",
-      allowed_domains: [urlInput.replace(/^https?:\/\//, "").split("/")[0]],
+      allowed_domains: domains,
       is_production: isProdInput,
       variables: {},
     };
@@ -95,6 +159,24 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
     setEnvironments([...environments, newEnv]);
     setModalOpen(false);
     success("Environment Added", `Configured '${nameInput}' with domain whitelisting.`);
+  };
+
+  const handleDeleteEnvironment = (env: EnvironmentItem) => {
+    confirm({
+      title: "Delete Environment",
+      message: `Permanently delete environment '${env.name}' (${env.base_url})? Workflows configured for this tier will need reassignment.`,
+      confirmText: "Delete Environment",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await environmentsApi.delete(env.id);
+        } catch {
+          // Fallback optimistic
+        }
+        setEnvironments(environments.filter((e) => e.id !== env.id));
+        success("Environment Deleted", `Removed '${env.name}'.`);
+      },
+    });
   };
 
   const handleTestTriggerInEnv = (env: EnvironmentItem) => {
@@ -130,13 +212,7 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
         </div>
 
         <button
-          onClick={() => {
-            setNameInput("Custom Sandbox");
-            setUrlInput("https://sandbox.company.internal");
-            setDescInput("");
-            setIsProdInput(false);
-            setModalOpen(true);
-          }}
+          onClick={handleOpenCreateModal}
           className="px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
         >
           <Plus className="w-4 h-4" />
@@ -155,7 +231,7 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
                 : "border-slate-200 dark:border-slate-800"
             }`}
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
@@ -173,15 +249,31 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
                 </p>
               </div>
 
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${
-                  env.status === "healthy"
-                    ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
-                    : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
-                }`}
-              >
-                {env.status}
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${
+                    env.status === "healthy"
+                      ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                      : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800"
+                  }`}
+                >
+                  {env.status}
+                </span>
+                <button
+                  onClick={() => handleOpenEditModal(env)}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                  title="Edit Environment"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDeleteEnvironment(env)}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 text-rose-600 dark:text-rose-400 transition"
+                  title="Delete Environment"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Base URL & Domain Whitelist */}
@@ -235,17 +327,20 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Globe className="w-4 h-4 text-emerald-500" />
-                <span>Create Environment</span>
+                <span>{editingEnv ? "Edit Environment" : "Create Environment"}</span>
               </h3>
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setEditingEnv(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateEnvironment} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveEnvironment} className="space-y-4 text-xs">
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Name *</label>
                 <input
@@ -293,7 +388,10 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                    setModalOpen(false);
+                    setEditingEnv(null);
+                  }}
                   className="px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
                 >
                   Cancel
@@ -302,7 +400,7 @@ export function EnvironmentsPage({ projectId, onNavigate }: EnvironmentsPageProp
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold shadow-xs"
                 >
-                  Save Environment
+                  {editingEnv ? "Save Changes" : "Create Environment"}
                 </button>
               </div>
             </form>

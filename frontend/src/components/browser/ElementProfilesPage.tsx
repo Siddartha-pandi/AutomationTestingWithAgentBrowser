@@ -78,6 +78,7 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
   };
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<ElementProfileItem | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<ElementProfileItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -91,6 +92,26 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
   const { success, error, info } = useToast();
   const { confirm } = useConfirm();
 
+  const handleOpenCreateModal = () => {
+    setEditingProfile(null);
+    setLogicalIdInput("");
+    setDescInput("");
+    setContextInput("Dashboard");
+    setTypeInput("button");
+    setSelectorInput("");
+    setModalOpen(true);
+  };
+
+  const handleOpenEditModal = (profile: ElementProfileItem) => {
+    setEditingProfile(profile);
+    setLogicalIdInput(profile.logical_id);
+    setDescInput(profile.description);
+    setContextInput(profile.page_context);
+    setTypeInput(profile.element_type);
+    setSelectorInput(profile.locators[0]?.value || "");
+    setModalOpen(true);
+  };
+
   const handleTestRecognition = (profile: ElementProfileItem) => {
     info("Testing Deterministic Match", `Running multi-factor scoring against live DOM for '${profile.logical_id}'...`);
     setTimeout(() => {
@@ -98,10 +119,45 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
     }, 1200);
   };
 
-  const handleCreateProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!logicalIdInput.trim()) {
       error("Logical ID Required", "Please provide a valid logical ID.");
+      return;
+    }
+
+    if (editingProfile) {
+      try {
+        await intelligenceApi.updateElement(editingProfile.id, {
+          logical_name: logicalIdInput.trim(),
+          description: descInput.trim() || undefined,
+          element_type: typeInput,
+          page_context: contextInput,
+        });
+      } catch {
+        // Optimistic
+      }
+
+      setProfiles(
+        profiles.map((p) =>
+          p.id === editingProfile.id
+            ? {
+                ...p,
+                logical_id: logicalIdInput.trim(),
+                description: descInput.trim() || p.description,
+                page_context: contextInput,
+                element_type: typeInput,
+                locators: selectorInput
+                  ? [{ type: "primary_selector", value: selectorInput, success_count: p.locators[0]?.success_count || 1 }]
+                  : p.locators,
+                last_updated: new Date().toISOString().split("T")[0],
+              }
+            : p
+        )
+      );
+      setModalOpen(false);
+      setEditingProfile(null);
+      success("Profile Updated", `Updated profile '${logicalIdInput}'.`);
       return;
     }
 
@@ -160,13 +216,7 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
         </div>
 
         <button
-          onClick={() => {
-            setLogicalIdInput("");
-            setDescInput("");
-            setContextInput("Dashboard");
-            setSelectorInput("");
-            setModalOpen(true);
-          }}
+          onClick={handleOpenCreateModal}
           className="px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
         >
           <Plus className="w-4 h-4" />
@@ -266,7 +316,7 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
                         <Play className="w-3.5 h-3.5" />
                       </button>
 
-                      {/* Inspect / Edit */}
+                      {/* Inspect Locator Candidates */}
                       <button
                         onClick={() => {
                           setSelectedProfile(profile);
@@ -276,6 +326,15 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
                         className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
                       >
                         <History className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Edit Profile */}
+                      <button
+                        onClick={() => handleOpenEditModal(profile)}
+                        title="Edit Profile"
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
                       </button>
 
                       {/* Delete */}
@@ -295,24 +354,27 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
         </div>
       </div>
 
-      {/* Create Modal Dialog */}
+      {/* Create / Edit Modal Dialog */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white dark:bg-[#161F30] rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <Crosshair className="w-4 h-4 text-[#2563EB]" />
-                <span>Create Element Profile</span>
+                <span>{editingProfile ? "Edit Element Profile" : "Create Element Profile"}</span>
               </h3>
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setEditingProfile(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateProfile} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-xs">
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
                   Logical Element ID *
@@ -387,7 +449,10 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                    setModalOpen(false);
+                    setEditingProfile(null);
+                  }}
                   className="px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
                 >
                   Cancel
@@ -396,7 +461,7 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold shadow-xs"
                 >
-                  Save Profile
+                  {editingProfile ? "Save Changes" : "Save Profile"}
                 </button>
               </div>
             </form>

@@ -30,6 +30,63 @@ from backend.config import settings
 logger = logging.getLogger(__name__)
 
 
+def resolve_approved_domains_for_execution(
+    db: SessionLocal,
+    execution: Execution,
+) -> list[str]:
+    """Resolves and enforces authorized domain allowlist for an execution.
+
+    Loads from:
+    1. Associated environment (if environment_id is present)
+    2. Project environments
+    3. Global settings.allowed_domains
+    Never silently uses empty allowlist in production; strips unrestricted wildcards.
+    """
+    from urllib.parse import urlparse
+    from backend.app.models.project import Environment
+    from backend.app.security.network_policy import is_local_dev_allowed
+
+    approved: set[str] = set()
+
+    # 1. Environment-specific domains
+    if execution.environment_id:
+        env = db.query(Environment).filter(Environment.id == execution.environment_id).first()
+        if env:
+            if env.allowed_domains and isinstance(env.allowed_domains, list):
+                approved.update(str(d).strip() for d in env.allowed_domains if str(d).strip())
+            if env.base_url:
+                try:
+                    host = urlparse(env.base_url).hostname
+                    if host:
+                        approved.add(host.lower())
+                except Exception:
+                    pass
+
+    # 2. Fallback to project environments if not set
+    if not approved and execution.project_id:
+        project_envs = db.query(Environment).filter(Environment.project_id == execution.project_id).all()
+        for env in project_envs:
+            if env.allowed_domains and isinstance(env.allowed_domains, list):
+                approved.update(str(d).strip() for d in env.allowed_domains if str(d).strip())
+
+    # 3. Fallback to settings.allowed_domains
+    if not approved:
+        approved.update(settings.allowed_domains)
+
+    # 4. Enforce security constraints
+    dev_mode = is_local_dev_allowed()
+    if not dev_mode:
+        # Strip unrestricted wildcards in production
+        approved = {d for d in approved if d not in ("*", "*.*", "all")}
+        if not approved:
+            raise ValueError(
+                f"Execution {execution.id} cannot be executed: No approved domain allowlist configured "
+                "for this project/environment. An explicit domain allowlist is required in production."
+            )
+
+    return sorted(list(approved))
+
+
 @celery_app.task(name="worker.execute_flow", bind=True)
 def execute_flow_task(
     self: Any,
@@ -62,11 +119,15 @@ def execute_flow_task(
 
         flow_graph = FlowGraphDefinition.model_validate(version.definition_json)
 
+        # Resolve approved domains and enforce non-empty domain policy
+        approved_domains = resolve_approved_domains_for_execution(db, execution)
+
         # Create isolated browser session
         session = session_manager.create_session(
             execution_id=str(execution_id),
             project_id=str(execution.project_id) if execution.project_id else None,
             user_id=str(execution.triggered_by or "system_worker"),
+            allowed_domains=approved_domains,
         )
         session_id = session.session_id
         execution.session_id = session_id
@@ -139,10 +200,14 @@ def execute_test_case_task(
 
         test_case = TestCaseDefinition.model_validate(version.definition_json)
 
+        # Resolve approved domains and enforce non-empty domain policy
+        approved_domains = resolve_approved_domains_for_execution(db, execution)
+
         session = session_manager.create_session(
             execution_id=str(execution_id),
             project_id=str(execution.project_id) if execution.project_id else None,
             user_id=str(execution.triggered_by or "system_worker"),
+            allowed_domains=approved_domains,
         )
         session_id = session.session_id
         execution.session_id = session_id
@@ -214,10 +279,14 @@ def execute_test_suite_task(
 
         test_suite = TestSuiteDefinition.model_validate(version.definition_json)
 
+        # Resolve approved domains and enforce non-empty domain policy
+        approved_domains = resolve_approved_domains_for_execution(db, execution)
+
         session = session_manager.create_session(
             execution_id=str(execution_id),
             project_id=str(execution.project_id) if execution.project_id else None,
             user_id=str(execution.triggered_by or "system_worker"),
+            allowed_domains=approved_domains,
         )
         session_id = session.session_id
         execution.session_id = session_id

@@ -7,6 +7,7 @@ import {
   Download,
   Plus,
   Trash2,
+  Edit,
   FileSpreadsheet,
   FileCode,
   Shield,
@@ -18,6 +19,7 @@ import {
   RotateCcw,
   Sparkles,
   Lock,
+  X,
 } from "lucide-react";
 import { useToast } from "../common/ToastProvider";
 import { useConfirm } from "../common/ConfirmModal";
@@ -81,11 +83,68 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
   const [maskSecrets, setMaskSecrets] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [datasetModalOpen, setDatasetModalOpen] = useState(false);
+  const [editingDataset, setEditingDataset] = useState<DatasetItem | null>(null);
+  const [dsNameInput, setDsNameInput] = useState("");
+  const [dsDescInput, setDsDescInput] = useState("");
+  const [dsFormatInput, setDsFormatInput] = useState<"csv" | "json">("csv");
 
   const { success, info, error } = useToast();
   const { confirm } = useConfirm();
 
   const activeDataset = datasets.find((d) => d.id === activeDatasetId) || datasets[0];
+
+  const handleOpenEditDatasetModal = (ds: DatasetItem) => {
+    setEditingDataset(ds);
+    setDsNameInput(ds.name);
+    setDsDescInput(ds.description);
+    setDsFormatInput(ds.format);
+    setDatasetModalOpen(true);
+  };
+
+  const handleSaveDatasetMetadata = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dsNameInput.trim()) {
+      error("Name Required", "Dataset title cannot be empty.");
+      return;
+    }
+
+    if (editingDataset) {
+      const updated = {
+        ...editingDataset,
+        name: dsNameInput.trim(),
+        description: dsDescInput.trim() || editingDataset.description,
+        format: dsFormatInput,
+        lastModified: "Just now",
+      };
+      setDatasets(datasets.map((d) => (d.id === editingDataset.id ? updated : d)));
+      setDatasetModalOpen(false);
+      setEditingDataset(null);
+      success("Dataset Updated", `Dataset '${dsNameInput}' configuration saved.`);
+    }
+  };
+
+  const handleDeleteDataset = (ds: DatasetItem) => {
+    confirm({
+      title: "Delete Test Dataset",
+      message: `Permanently delete dataset '${ds.name}' (${ds.rowCount} rows)? Data-driven iterations depending on this dataset will fail.`,
+      confirmText: "Delete Dataset",
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          await testsApi.deleteDataset(ds.id);
+        } catch {
+          // Optimistic update
+        }
+        const remaining = datasets.filter((d) => d.id !== ds.id);
+        setDatasets(remaining);
+        if (remaining.length > 0) {
+          setActiveDatasetId(remaining[0].id);
+        }
+        success("Dataset Deleted", `Removed dataset '${ds.name}'.`);
+      },
+    });
+  };
 
   // Save active dataset to PostgreSQL backend
   const handleSaveToDatabase = async () => {
@@ -226,10 +285,10 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
 
           <div className="space-y-1.5">
             {datasets.map((ds) => (
-              <button
+              <div
                 key={ds.id}
                 onClick={() => setActiveDatasetId(ds.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer group ${
                   activeDatasetId === ds.id
                     ? "bg-blue-50/70 dark:bg-blue-950/40 border-blue-500/50 shadow-sm"
                     : "bg-transparent border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/60"
@@ -239,15 +298,37 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
                   <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
                     {ds.name}
                   </span>
-                  <span
-                    className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                      ds.format === "csv"
-                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
-                        : "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-400"
-                    }`}
-                  >
-                    {ds.format}
-                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span
+                      className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                        ds.format === "csv"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400"
+                          : "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-400"
+                      }`}
+                    >
+                      {ds.format}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditDatasetModal(ds);
+                      }}
+                      className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                      title="Edit Dataset Metadata"
+                    >
+                      <Edit className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDataset(ds);
+                      }}
+                      className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                      title="Delete Dataset"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
                   {ds.description}
@@ -256,7 +337,7 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
                   <span>{ds.rowCount} rows</span>
                   <span>{ds.lastModified}</span>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -277,6 +358,22 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleOpenEditDatasetModal(activeDataset)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 rounded-lg shadow-sm transition-colors"
+                  title="Edit Dataset Details"
+                >
+                  <Edit className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Edit Dataset</span>
+                </button>
+                <button
+                  onClick={() => handleDeleteDataset(activeDataset)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold text-rose-600 rounded-lg shadow-sm transition-colors"
+                  title="Delete Dataset"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Delete</span>
+                </button>
                 <button
                   onClick={handleAddRow}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 rounded-lg shadow-sm transition-colors"
@@ -370,6 +467,91 @@ export function TestDataPage({ projectId, onNavigate }: TestDataPageProps) {
           </div>
         )}
       </div>
+
+      {/* Dataset Metadata Modal */}
+      {datasetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#161F30] rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Database className="w-4 h-4 text-blue-600" />
+                <span>Edit Dataset Details</span>
+              </h3>
+              <button
+                onClick={() => {
+                  setDatasetModalOpen(false);
+                  setEditingDataset(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDatasetMetadata} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Dataset Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. User Roles & Auth Matrix"
+                  value={dsNameInput}
+                  onChange={(e) => setDsNameInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Dataset parameter description..."
+                  value={dsDescInput}
+                  onChange={(e) => setDsDescInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                  Format
+                </label>
+                <select
+                  value={dsFormatInput}
+                  onChange={(e) => setDsFormatInput(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="csv">CSV (Comma-Separated Values)</option>
+                  <option value="json">JSON (Structured Object Array)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDatasetModalOpen(false);
+                    setEditingDataset(null);
+                  }}
+                  className="px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
+                >
+                  Save Dataset
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

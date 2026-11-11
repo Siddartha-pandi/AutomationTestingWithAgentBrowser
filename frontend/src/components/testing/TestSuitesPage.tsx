@@ -69,6 +69,7 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
   }, [projectId]);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingSuite, setEditingSuite] = useState<TestSuiteItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [runningSuiteId, setRunningSuiteId] = useState<string | null>(null);
 
@@ -82,10 +83,54 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
 
   const activeSuite = suites.find((s) => s.id === selectedSuiteId) || suites[0];
 
-  const handleCreateSuite = (e: React.FormEvent) => {
+  const handleOpenCreateModal = () => {
+    setEditingSuite(null);
+    setNewSuiteName("");
+    setNewSuiteDesc("");
+    setNewSequenceMode("Sequential");
+    setModalOpen(true);
+  };
+
+  const handleOpenEditModal = (suite: TestSuiteItem) => {
+    setEditingSuite(suite);
+    setNewSuiteName(suite.name);
+    setNewSuiteDesc(suite.description);
+    setNewSequenceMode(suite.sequence_mode);
+    setModalOpen(true);
+  };
+
+  const handleSaveSuite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSuiteName.trim()) {
       error("Suite Name Required", "Please enter a test suite title.");
+      return;
+    }
+
+    if (editingSuite) {
+      try {
+        await testSuitesApi.update(editingSuite.id, {
+          name: newSuiteName.trim(),
+          description: newSuiteDesc.trim() || undefined,
+        });
+      } catch {
+        // Optimistic
+      }
+
+      setSuites(
+        suites.map((s) =>
+          s.id === editingSuite.id
+            ? {
+                ...s,
+                name: newSuiteName.trim(),
+                description: newSuiteDesc.trim() || s.description,
+                sequence_mode: newSequenceMode,
+              }
+            : s
+        )
+      );
+      setModalOpen(false);
+      setEditingSuite(null);
+      success("Test Suite Updated", `Updated suite "${newSuiteName}".`);
       return;
     }
 
@@ -107,6 +152,17 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
     setSelectedSuiteId(newSuite.id);
     setModalOpen(false);
     success("Test Suite Created", `Suite "${newSuiteName}" created.`);
+  };
+
+  const handleRemoveTestFromSuite = (suite: TestSuiteItem, testId: string) => {
+    const updatedTests = suite.tests.filter((t) => t.id !== testId);
+    const updatedSuite = {
+      ...suite,
+      tests: updatedTests,
+      total_tests: updatedTests.length,
+    };
+    setSuites(suites.map((s) => (s.id === suite.id ? updatedSuite : s)));
+    success("Test Removed", "Test case removed from suite sequence.");
   };
 
   const handleRunSuite = async (suite: TestSuiteItem) => {
@@ -164,12 +220,7 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
         </div>
 
         <button
-          onClick={() => {
-            setNewSuiteName("");
-            setNewSuiteDesc("");
-            setNewSequenceMode("Sequential");
-            setModalOpen(true);
-          }}
+          onClick={handleOpenCreateModal}
           className="px-3.5 py-2 rounded-xl bg-[#2563EB] hover:bg-blue-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
         >
           <Plus className="w-4 h-4" />
@@ -204,19 +255,41 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
                 <div
                   key={s.id}
                   onClick={() => setSelectedSuiteId(s.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition ${
+                  className={`p-4 rounded-xl border cursor-pointer transition group ${
                     selectedSuiteId === s.id
                       ? "bg-white dark:bg-[#161F30] border-blue-600 dark:border-blue-500 ring-2 ring-blue-500/10 shadow-sm"
                       : "bg-white dark:bg-[#161F30] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-1.5">
                     <h3 className="font-bold text-xs text-slate-900 dark:text-slate-100 truncate pr-2">
                       {s.name}
                     </h3>
-                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 shrink-0">
-                      {s.sequence_mode}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {s.sequence_mode}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(s);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        title="Edit Suite"
+                      >
+                        <Edit className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSuite(s);
+                        }}
+                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        title="Delete Suite"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                     {s.description}
@@ -288,6 +361,14 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
                       <span>Run Complete Suite</span>
                     </button>
                   )}
+
+                  <button
+                    onClick={() => handleOpenEditModal(activeSuite)}
+                    className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                    title="Edit Suite"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
 
                   <button
                     onClick={() => handleDeleteSuite(activeSuite)}
@@ -370,13 +451,21 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => success("Sequence Updated", `Priority moved for ${test.name}`)}
                         className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
                         title="Reorder"
                       >
                         <ArrowUpDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleRemoveTestFromSuite(activeSuite, test.id)}
+                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        title="Remove Test from Suite"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -387,24 +476,27 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
         )}
       </div>
 
-      {/* Create Suite Modal Dialog */}
+      {/* Create / Edit Suite Modal Dialog */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white dark:bg-[#161F30] rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <FolderKanban className="w-4 h-4 text-purple-600" />
-                <span>Create New Test Suite</span>
+                <span>{editingSuite ? "Edit Test Suite" : "Create New Test Suite"}</span>
               </h3>
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setEditingSuite(null);
+                }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSuite} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveSuite} className="space-y-4 text-xs">
               <div>
                 <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Suite Name *</label>
                 <input
@@ -443,7 +535,10 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                    setModalOpen(false);
+                    setEditingSuite(null);
+                  }}
                   className="px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
                 >
                   Cancel
@@ -452,7 +547,7 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
                   type="submit"
                   className="px-4 py-2 rounded-lg bg-[#2563EB] hover:bg-blue-600 text-white font-semibold shadow-xs"
                 >
-                  Create Suite
+                  {editingSuite ? "Save Changes" : "Create Suite"}
                 </button>
               </div>
             </form>
