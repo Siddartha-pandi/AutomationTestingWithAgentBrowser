@@ -139,7 +139,11 @@ class AgentBrowserAdapter:
         if not is_valid:
             raise NavigationSecurityError(url, reason)
 
-        res = self.executor.execute(["open", url], session_id=session_id, timeout=timeout)
+        extra_env = {}
+        if active_domains:
+            extra_env["AGENT_BROWSER_ALLOWED_DOMAINS"] = ",".join(active_domains)
+
+        res = self.executor.execute(["open", url], session_id=session_id, timeout=timeout, extra_env=extra_env)
 
         # Validate post-navigation destination for redirect SSRF
         try:
@@ -714,12 +718,26 @@ class AgentBrowserAdapter:
         session_id: str,
         js_code: str | None = None,
         expression: str | None = None,
-        timeout: float = 15.0,
+        timeout: float = 20.0,
     ) -> Any:
-        """Executes JavaScript deterministically using base64 encoding to prevent shell escaping."""
+        """Executes JavaScript deterministically using stdin piping for large scripts or base64 for short expressions."""
         code = js_code or expression or ""
-        encoded = base64.b64encode(code.encode("utf-8")).decode("utf-8")
-        res = self.executor.execute(["eval", "-b", encoded], session_id=session_id, timeout=timeout, parse_json=True)
+        if len(code) > 200 or "\n" in code:
+            res = self.executor.execute(
+                ["eval", "--stdin"],
+                session_id=session_id,
+                timeout=timeout,
+                parse_json=True,
+                stdin_input=code,
+            )
+        else:
+            encoded = base64.b64encode(code.encode("utf-8")).decode("utf-8")
+            res = self.executor.execute(
+                ["eval", "-b", encoded],
+                session_id=session_id,
+                timeout=timeout,
+                parse_json=True,
+            )
         if isinstance(res.json_data, dict) and "data" in res.json_data and "result" in res.json_data["data"]:
             return res.json_data["data"]["result"]
         return res.json_data if res.json_data is not None else res.stdout.strip()

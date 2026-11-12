@@ -69,6 +69,14 @@ class DOMExtractRequest(BaseModel):
     selector: str | None = None
 
 
+class DOMExploreRequest(BaseModel):
+    """Request payload to explore a URL and extract dynamic DOM with live screenshot."""
+
+    project_id: str = Field(min_length=1, max_length=64)
+    url: str = Field(min_length=1, max_length=512)
+    session_id: str | None = None
+
+
 class DOMExtractResponse(BaseModel):
     """Full snapshot of page elements and metadata."""
 

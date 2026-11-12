@@ -169,6 +169,18 @@ export const executionsApi = {
 export const intelligenceApi = {
   extractDom: (sessionId: string, selector?: string) =>
     request<any>("/api/v1/dom/extract", { method: "POST", body: { session_id: sessionId, selector } }),
+  exploreDom: (projectId: string, url: string, sessionId?: string) =>
+    request<{
+      session_id: string;
+      page_url: string;
+      page_title: string;
+      screenshot: string | null;
+      total_elements: number;
+      elements: any[];
+    }>("/api/v1/dom/explore", {
+      method: "POST",
+      body: { project_id: projectId, url, session_id: sessionId },
+    }),
   listElements: (projectId: string) =>
     request<any[]>(`/api/v1/elements?project_id=${projectId}`),
   createElement: (data: any) =>

@@ -5,23 +5,26 @@ import { AppShell, NavView } from "@/components/layout/AppShell";
 import { EnterpriseLoginForm } from "@/components/auth/EnterpriseLoginForm";
 import { BrowserAutomationLogo } from "@/components/common/BrowserLogo";
 
-// Page Imports for all 27 Pages
+// Page Imports for all 30 Pages
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview"; // Page 1
 import { AllFlowsPage } from "@/components/flows/AllFlowsPage"; // Page 2
 import { VisualFlowBuilder } from "@/components/flows/VisualFlowBuilder"; // Page 3
 import { CreateFlowPage } from "@/components/flows/CreateFlowPage"; // Page 4
-import { SchedulesPage } from "@/components/flows/SchedulesPage"; // Page 5
+import { FlowTemplatesPage } from "@/components/flows/FlowTemplatesPage"; // Page 5
+import { SchedulesPage } from "@/components/flows/SchedulesPage"; // Page 6
 
-import { TestCasesPage } from "@/components/testing/TestCasesPage"; // Page 6
-import { TestSuitesPage } from "@/components/testing/TestSuitesPage"; // Page 7
-import { VisualTestBuilder } from "@/components/testing/VisualTestBuilder"; // Page 8
-import { TestReportsPage } from "@/components/testing/TestReportsPage"; // Page 9
+import { TestCasesPage } from "@/components/testing/TestCasesPage"; // Page 7
+import { TestSuitesPage } from "@/components/testing/TestSuitesPage"; // Page 8
+import { VisualTestBuilder } from "@/components/testing/VisualTestBuilder"; // Page 9
+import { TestReportsPage } from "@/components/testing/TestReportsPage"; // Page 10
+import { TestDataPage } from "@/components/testing/TestDataPage"; // Page 11
 
-import { LiveBrowserPage } from "@/components/browser/LiveBrowserPage"; // Page 10
-import { DOMExplorerPage } from "@/components/browser/DOMExplorerPage"; // Page 11
-import { ElementProfilesPage } from "@/components/browser/ElementProfilesPage"; // Page 12
-import { ElementRecognitionPage } from "@/components/browser/ElementRecognitionPage"; // Page 13
-import { SelfHealingPage } from "@/components/browser/SelfHealingPage"; // Page 14
+import { LiveBrowserPage } from "@/components/browser/LiveBrowserPage"; // Page 12
+import { BrowserRecorderPage } from "@/components/browser/BrowserRecorderPage"; // Page 13
+import { DOMExplorerPage } from "@/components/browser/DOMExplorerPage"; // Page 14
+import { ElementProfilesPage } from "@/components/browser/ElementProfilesPage"; // Page 15
+import { ElementRecognitionPage } from "@/components/browser/ElementRecognitionPage"; // Page 16
+import { SelfHealingPage } from "@/components/browser/SelfHealingPage"; // Page 17
 
 import { RunningExecutionsPage } from "@/components/executions/RunningExecutionsPage"; // Page 15
 import { ExecutionHistoryPage } from "@/components/executions/ExecutionHistoryPage"; // Page 16
@@ -109,6 +112,10 @@ export default function Home() {
         }
       })
       .catch((err) => {
+        if (err?.message?.includes("401") || err?.message?.includes("credentials") || err?.message?.includes("expired")) {
+          // Normal auth token expiration handled gracefully by auth:unauthorized event listener
+          return;
+        }
         console.warn("Could not fetch projects list:", err);
       });
   }, [user]);
@@ -160,7 +167,7 @@ export default function Home() {
   }
 
   // ---------------------------------------------------------------------------
-  // Dedicated View Switcher for all 27 Pages
+  // Dedicated View Switcher for all 30 Pages
   // ---------------------------------------------------------------------------
   function renderView() {
     switch (currentView) {
@@ -204,6 +211,15 @@ export default function Home() {
               setSelectedFlowId(newId);
               setCurrentView("automation_builder");
             }}
+          />
+        );
+
+      case "automation_templates":
+        return (
+          <FlowTemplatesPage
+            projectId={currentProject.id}
+            onNavigate={setCurrentView}
+            onSelectFlow={setSelectedFlowId}
           />
         );
 
@@ -256,12 +272,30 @@ export default function Home() {
           />
         );
 
+      case "testing_data":
+        return (
+          <TestDataPage
+            projectId={currentProject.id}
+            onNavigate={setCurrentView}
+          />
+        );
+
       // 4. BROWSER INTELLIGENCE
       case "browser_live":
         return (
           <LiveBrowserPage
             projectId={currentProject.id}
             onNavigate={setCurrentView}
+          />
+        );
+
+      case "browser_recorder":
+        return (
+          <BrowserRecorderPage
+            projectId={currentProject.id}
+            onNavigate={setCurrentView}
+            onSelectFlow={setSelectedFlowId}
+            onSelectTest={setSelectedTestId}
           />
         );
 

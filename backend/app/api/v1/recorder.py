@@ -95,8 +95,8 @@ def start_recorder(
             user_id=str(current_user.id),
             allowed_domains=allowed_domains,
         )
-        # Navigate to initial URL
-        _browser_adapter.navigate(session_id=session_id, url=payload.target_url)
+        # Navigate to initial URL with 45s launch allowance
+        _browser_adapter.navigate(session_id=session_id, url=payload.target_url, timeout=45.0)
 
         _ACTIVE_RECORDINGS[session_id] = {
             "project_id": str(proj.id),
@@ -138,6 +138,11 @@ def start_recorder(
             _browser_adapter.close(session_id)
         except Exception:
             pass
+        if hasattr(_browser_adapter.executor, "_kill_session_daemon"):
+            try:
+                _browser_adapter.executor._kill_session_daemon(session_id)
+            except Exception:
+                pass
         logger.error("Failed to start recorder session: %s", err)
         raise HTTPException(status_code=500, detail=str(err))
 

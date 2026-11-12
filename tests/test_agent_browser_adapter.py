@@ -263,13 +263,14 @@ class TestAdapterMethodsMocked:
     def adapter_with_mock(self) -> AgentBrowserAdapter:
         adapter = AgentBrowserAdapter()
         adapter.executor = MagicMock()
-        adapter.executor.allowed_domains = []
+        adapter.executor.allowed_domains = ["example.com"]
         adapter.session_manager = MagicMock()
         adapter.session_manager.get_session.return_value = None
         adapter.screenshot_manager = MagicMock()
         return adapter
 
-    def test_navigation_and_actions(self, adapter_with_mock: AgentBrowserAdapter) -> None:
+    @patch("backend.app.security.network_policy.validate_destination_url", return_value=(True, "Allowed"))
+    def test_navigation_and_actions(self, mock_val: MagicMock, adapter_with_mock: AgentBrowserAdapter) -> None:
         adapter = adapter_with_mock
         adapter.executor.execute.return_value = CommandResult(
             command=["agent-browser"], returncode=0, stdout="done", stderr="", duration_ms=25.0

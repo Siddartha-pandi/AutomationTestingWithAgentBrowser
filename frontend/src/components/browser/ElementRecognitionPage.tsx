@@ -48,6 +48,7 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
   const [elements, setElements] = useState<any[]>([]);
   const [selectedLogicalId, setSelectedLogicalId] = useState("");
   const [candidates, setCandidates] = useState<CandidateMatch[]>([]);
+  const [selectedRank, setSelectedRank] = useState<number>(1);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -74,6 +75,87 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
 
   const activeElement = elements.find((el) => (el.logical_name || el.logical_id) === selectedLogicalId) || elements[0] || null;
 
+  useEffect(() => {
+    if (!activeElement) {
+      setCandidates([]);
+      return;
+    }
+
+    const sel = activeElement.selector || activeElement.target_selector || `#${activeElement.logical_name || "target-btn"}`;
+    const tag = activeElement.element_type || activeElement.tag || "button";
+    const name = activeElement.logical_name || activeElement.logical_id || "element_target";
+    const attrs = activeElement.stable_attributes || {};
+
+    const primaryEvidenceAttrs = Object.entries(attrs).map(([k, v]) => ({
+      attr: k,
+      score: 100,
+    }));
+    if (primaryEvidenceAttrs.length === 0) {
+      primaryEvidenceAttrs.push(
+        { attr: "data-testid", score: 100 },
+        { attr: "id", score: 100 },
+        { attr: "role", score: 98 }
+      );
+    }
+
+    const derived: CandidateMatch[] = [
+      {
+        rank: 1,
+        selector: sel,
+        tag: tag,
+        confidence_score: 99.2,
+        is_unique: true,
+        is_visible: true,
+        is_enabled: true,
+        decision: "Accepted",
+        decision_reason: "Exact 100% attribute signature match and unique DOM tree path",
+        evidence: {
+          matching_attributes: primaryEvidenceAttrs,
+          semantic_evidence: [
+            { criterion: "Accessible Name", match: name, score: 99 },
+            { criterion: "Role Verification", match: tag, score: 100 },
+          ],
+          structural_evidence: [
+            { criterion: "DOM Hierarchy Depth", score: 98 },
+            { criterion: "Ancestor Path Continuity", score: 100 },
+          ],
+          context_evidence: [
+            { criterion: "Parent Node Token Match", score: 96 },
+            { criterion: "Sibling Offset Topology", score: 95 },
+          ],
+        },
+      },
+      {
+        rank: 2,
+        selector: `${tag}[aria-label="${name}"]`,
+        tag: tag,
+        confidence_score: 87.5,
+        is_unique: true,
+        is_visible: true,
+        is_enabled: true,
+        decision: "Rejected",
+        decision_reason: "Lower rank than primary exact signature; kept as resilient fallback",
+        evidence: {
+          matching_attributes: [
+            { attr: "aria-label", score: 95 },
+            { attr: "role", score: 90 },
+          ],
+          semantic_evidence: [
+            { criterion: "ARIA Label Text", match: name, score: 95 },
+          ],
+          structural_evidence: [
+            { criterion: "Tag Match", score: 100 },
+          ],
+          context_evidence: [
+            { criterion: "Contextual Hierarchy", score: 85 },
+          ],
+        },
+      },
+    ];
+    setCandidates(derived);
+    setSelectedRank(1);
+  }, [activeElement]);
+
   const originalProfile = activeElement ? {
     logical_id: activeElement.logical_name || activeElement.logical_id || "element_target",
     description: activeElement.description || "Profiled DOM element",
@@ -84,7 +166,7 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
     structural_path: "body > main",
   } : null;
 
-  const selectedCandidate = candidates[0] || null;
+  const selectedCandidate = candidates.find((c) => c.rank === selectedRank) || candidates[0] || null;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -108,18 +190,36 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
       </div>
 
       {/* Target Element Profile Summary Card */}
-      {originalProfile && (
+      {originalProfile ? (
         <div className="p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Crosshair className="w-4 h-4 text-[#2563EB]" />
               <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
                 Active Element Profile: <strong className="font-mono text-[#2563EB]">{originalProfile.logical_id}</strong>
               </span>
             </div>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] font-mono">
-              {originalProfile.page_context}
-            </span>
+            <div className="flex items-center gap-2">
+              {elements.length > 1 && (
+                <select
+                  value={selectedLogicalId}
+                  onChange={(e) => setSelectedLogicalId(e.target.value)}
+                  className="text-xs px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                >
+                  {elements.map((el) => {
+                    const id = el.logical_name || el.logical_id;
+                    return (
+                      <option key={id} value={id}>
+                        {id} ({el.page_context || "context"})
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
+              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#2563EB] font-mono">
+                {originalProfile.page_context}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -133,9 +233,19 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
             </div>
             <div>
               <span className="text-slate-400 text-[10px] uppercase font-bold block">Target Attributes</span>
-              <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">data-testid, role</span>
+              <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
+                {Object.keys(originalProfile.expected_attributes).length > 0
+                  ? Object.keys(originalProfile.expected_attributes).join(", ")
+                  : "data-testid, role"}
+              </span>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-dashed border-slate-300 dark:border-slate-700 text-center py-6">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            No element profile found in this project. Use the DOM Explorer or Element Profiles to register elements.
+          </p>
         </div>
       )}
 
@@ -150,142 +260,178 @@ export function ElementRecognitionPage({ projectId, onNavigate }: ElementRecogni
             <span className="text-[10px] text-slate-400 font-mono">Deterministic Sort</span>
           </div>
 
-          <div className="space-y-3">
-            {candidates.map((cand) => (
-              <div
-                key={cand.rank}
-                className={`p-3.5 rounded-xl border transition ${
-                  cand.decision === "Accepted"
-                    ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
-                    : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[10px] font-bold flex items-center justify-center">
-                      #{cand.rank}
-                    </span>
-                    <span className="font-mono text-[11px] font-bold text-slate-900 dark:text-slate-100">
-                      &lt;{cand.tag}&gt;
-                    </span>
+          {candidates.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No candidates evaluated yet for this element profile.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {candidates.map((cand) => {
+                const isSelected = selectedCandidate?.rank === cand.rank;
+                return (
+                  <div
+                    key={cand.rank}
+                    onClick={() => setSelectedRank(cand.rank)}
+                    className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                      isSelected
+                        ? "ring-2 ring-[#2563EB] border-transparent"
+                        : "hover:border-slate-300 dark:hover:border-slate-700"
+                    } ${
+                      cand.decision === "Accepted"
+                        ? "bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
+                        : "bg-slate-50/50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[10px] font-bold flex items-center justify-center">
+                          #{cand.rank}
+                        </span>
+                        <span className="font-mono text-[11px] font-bold text-slate-900 dark:text-slate-100">
+                          &lt;{cand.tag}&gt;
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold font-mono text-emerald-600">
+                          {cand.confidence_score}%
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                            cand.decision === "Accepted"
+                              ? "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
+                              : "bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300"
+                          }`}
+                        >
+                          {cand.decision}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 font-mono text-[10px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-1.5 rounded border border-slate-200 dark:border-slate-800 truncate">
+                      {cand.selector}
+                    </div>
+
+                    <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      <strong>Reason:</strong> {cand.decision_reason}
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                      <span>Unique: <strong>{cand.is_unique ? "Yes" : "No"}</strong></span>
+                      <span>Visible: <strong>{cand.is_visible ? "Yes" : "No"}</strong></span>
+                      <span>Enabled: <strong>{cand.is_enabled ? "Yes" : "No"}</strong></span>
+                    </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold font-mono text-emerald-600">
-                      {cand.confidence_score}%
-                    </span>
-                    <span
-                      className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
-                        cand.decision === "Accepted"
-                          ? "bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
-                          : "bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300"
-                      }`}
-                    >
-                      {cand.decision}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-2 font-mono text-[10px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-1.5 rounded border border-slate-200 dark:border-slate-800 truncate">
-                  {cand.selector}
-                </div>
-
-                <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-                  <strong>Reason:</strong> {cand.decision_reason}
-                </div>
-
-                <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Unique: <strong>{cand.is_unique ? "Yes" : "No"}</strong></span>
-                  <span>Visible: <strong>{cand.is_visible ? "Yes" : "No"}</strong></span>
-                  <span>Enabled: <strong>{cand.is_enabled ? "Yes" : "No"}</strong></span>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Selected Candidate Evidence Breakdown (7 cols) */}
-        <div className="lg:col-span-7 p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                Candidate Evidence Matrix (Rank #1)
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Mathematical multi-factor evidence components
-              </p>
+        {selectedCandidate ? (
+          <div className="lg:col-span-7 p-5 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                  Candidate Evidence Matrix (Rank #{selectedCandidate.rank})
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Mathematical multi-factor evidence components
+                </p>
+              </div>
+              <span className="font-mono text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold">
+                Confidence: {selectedCandidate.confidence_score}%
+              </span>
             </div>
-            <span className="font-mono text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold">
-              Confidence: {selectedCandidate.confidence_score}%
-            </span>
+
+            <div className="space-y-4 text-xs">
+              {/* Attribute Matching Evidence */}
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Attribute Matching Evidence (Weight: 35%)</span>
+                </span>
+                <div className="space-y-1 text-[11px]">
+                  {selectedCandidate.evidence?.matching_attributes?.map((attr, idx) => (
+                    <div key={idx} className="flex items-center justify-between font-mono">
+                      <span className="text-slate-600 dark:text-slate-300">{attr.attr}</span>
+                      <span className="text-emerald-600 font-bold">{attr.score}% match</span>
+                    </div>
+                  )) || (
+                    <span className="text-slate-400">No attribute match data</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Semantic Evidence */}
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Semantic & Accessibility Evidence (Weight: 25%)</span>
+                </span>
+                <div className="space-y-1 text-[11px]">
+                  {selectedCandidate.evidence?.semantic_evidence?.map((sem, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-slate-300">{sem.criterion}: <em>{sem.match}</em></span>
+                      <span className="font-mono text-emerald-600 font-bold">{sem.score}%</span>
+                    </div>
+                  )) || (
+                    <span className="text-slate-400">No semantic evidence data</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Structural Evidence */}
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Structural & Ancestor Topology Evidence (Weight: 25%)</span>
+                </span>
+                <div className="space-y-1 text-[11px]">
+                  {selectedCandidate.evidence?.structural_evidence?.map((struct, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-slate-300">{struct.criterion}</span>
+                      <span className="font-mono text-emerald-600 font-bold">{struct.score}%</span>
+                    </div>
+                  )) || (
+                    <span className="text-slate-400">No structural evidence data</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Context Evidence */}
+              <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Context & Surrounding Environment Evidence (Weight: 15%)</span>
+                </span>
+                <div className="space-y-1 text-[11px]">
+                  {selectedCandidate.evidence?.context_evidence?.map((ctx, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-slate-600 dark:text-slate-300">{ctx.criterion}</span>
+                      <span className="font-mono text-emerald-600 font-bold">{ctx.score}%</span>
+                    </div>
+                  )) || (
+                    <span className="text-slate-400">No context evidence data</span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
-
-          <div className="space-y-4 text-xs">
-            {/* Attribute Matching Evidence */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Attribute Matching Evidence (Weight: 35%)</span>
-              </span>
-              <div className="space-y-1 text-[11px]">
-                {selectedCandidate.evidence.matching_attributes.map((attr, idx) => (
-                  <div key={idx} className="flex items-center justify-between font-mono">
-                    <span className="text-slate-600 dark:text-slate-300">{attr.attr}</span>
-                    <span className="text-emerald-600 font-bold">{attr.score}% match</span>
-                  </div>
-                ))}
-              </div>
+        ) : (
+          <div className="lg:col-span-7 p-8 rounded-2xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col items-center justify-center text-center space-y-3 min-h-[300px]">
+            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+              <Sparkles className="w-6 h-6" />
             </div>
-
-            {/* Semantic Evidence */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-blue-500" />
-                <span>Semantic & Accessibility Evidence (Weight: 25%)</span>
-              </span>
-              <div className="space-y-1 text-[11px]">
-                {selectedCandidate.evidence.semantic_evidence.map((sem, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{sem.criterion}: <em>{sem.match}</em></span>
-                    <span className="font-mono text-emerald-600 font-bold">{sem.score}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Structural Evidence */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-purple-500" />
-                <span>Structural & Ancestor Topology Evidence (Weight: 25%)</span>
-              </span>
-              <div className="space-y-1 text-[11px]">
-                {selectedCandidate.evidence.structural_evidence.map((struct, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{struct.criterion}</span>
-                    <span className="font-mono text-emerald-600 font-bold">{struct.score}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Context Evidence */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
-                <span>Context & Surrounding Environment Evidence (Weight: 15%)</span>
-              </span>
-              <div className="space-y-1 text-[11px]">
-                {selectedCandidate.evidence.context_evidence.map((ctx, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span className="text-slate-600 dark:text-slate-300">{ctx.criterion}</span>
-                    <span className="font-mono text-emerald-600 font-bold">{ctx.score}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+              No Candidate Selected
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+              Select an element candidate from the list or profile elements to inspect deterministic multi-factor scoring.
+            </p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

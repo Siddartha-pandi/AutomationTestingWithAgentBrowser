@@ -191,3 +191,47 @@ class TestElementProfilesAPI:
         not_found = client.get(f"/api/v1/elements/{profile_id}", headers=headers)
         assert not_found.status_code == 404
 
+    def test_dom_explore_endpoint(self, test_context: tuple[TestClient, str, uuid.UUID], monkeypatch: pytest.MonkeyPatch) -> None:
+        client, token, project_id = test_context
+        headers = {"Authorization": f"Bearer {token}"}
+
+        from backend.app.api.v1.dom import _browser_adapter
+        from backend.app.intelligence.dom_extractor import FullDOMSnapshot, ExtractedElementNode
+
+        mock_snap = FullDOMSnapshot(
+            page_url="https://example.com",
+            route_path="/",
+            page_title="Example Domain",
+            timestamp="2026-11-12T00:00:00Z",
+            total_elements=1,
+            elements=[
+                ExtractedElementNode(
+                    tag="h1",
+                    text="Example Domain",
+                    element_id="main-title",
+                    stable_attributes={"id": "main-title"},
+                    is_visible=True,
+                    is_enabled=True,
+                    box={"x": 50, "y": 50, "width": 200, "height": 30},
+                )
+            ],
+        )
+
+        monkeypatch.setattr(_browser_adapter, "launch", lambda **kw: MagicMock())
+        monkeypatch.setattr(_browser_adapter, "navigate", lambda **kw: MagicMock(success=True))
+        monkeypatch.setattr(_browser_adapter, "screenshot", lambda **kw: MagicMock(file_path="nonexistent.png"))
+        from backend.app.intelligence.dom_extractor import DOMExtractor
+        monkeypatch.setattr(DOMExtractor, "extract_full_dom", lambda self, s_id: mock_snap)
+
+        res = client.post(
+            "/api/v1/dom/explore",
+            json={"project_id": str(project_id), "url": "https://example.com"},
+            headers=headers,
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["page_title"] == "Example Domain"
+        assert data["total_elements"] == 1
+        assert len(data["elements"]) == 1
+        assert data["elements"][0]["tag"] == "h1"
+

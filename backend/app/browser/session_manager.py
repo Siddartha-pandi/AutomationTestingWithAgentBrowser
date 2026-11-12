@@ -147,6 +147,10 @@ class SessionManager:
         except Exception as err:
             logger.warning("Error closing session '%s' via CLI: %s", session_id, err)
 
+        # Force terminate any remaining daemon process and stale socket files for this session
+        if hasattr(self.executor, "_kill_session_daemon"):
+            self.executor._kill_session_daemon(session_id)
+
         session = self._active_sessions.get(session_id)
         if session:
             session.is_active = False
@@ -165,4 +169,7 @@ class SessionManager:
             self.executor.execute(["close", "--all"], timeout=15.0)
         except Exception as err:
             logger.warning("Notice on close --all: %s", err)
+        for sess_id in list(self._active_sessions.keys()):
+            if hasattr(self.executor, "_kill_session_daemon"):
+                self.executor._kill_session_daemon(sess_id)
 

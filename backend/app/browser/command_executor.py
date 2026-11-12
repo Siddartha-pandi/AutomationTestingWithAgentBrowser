@@ -89,17 +89,28 @@ class CommandExecutor:
 
         # Windows-specific search paths
         if os.name == "nt":
-            npm_path = Path(os.environ.get("APPDATA", "")) / "npm" / "agent-browser.cmd"
+            appdata = os.environ.get("APPDATA", "")
+            if appdata:
+                # Prefer direct native binary on Windows to avoid cmd.exe argument mangling and zombie wrappers
+                win_exe = Path(appdata) / "npm" / "node_modules" / "agent-browser" / "bin" / "agent-browser-win32-x64.exe"
+                if win_exe.exists():
+                    return str(win_exe)
+
+            npm_path = Path(appdata) / "npm" / "agent-browser.cmd"
             if npm_path.exists():
                 return str(npm_path)
 
-            npm_ps1 = Path(os.environ.get("APPDATA", "")) / "npm" / "agent-browser.ps1"
+            npm_ps1 = Path(appdata) / "npm" / "agent-browser.ps1"
             if npm_ps1.exists():
                 return str(npm_ps1)
 
         # Standard PATH lookup
         found = shutil.which("agent-browser")
         if found:
+            if os.name == "nt" and found.lower().endswith(".cmd"):
+                direct_exe = Path(found).parent / "node_modules" / "agent-browser" / "bin" / "agent-browser-win32-x64.exe"
+                if direct_exe.exists():
+                    return str(direct_exe)
             return found
 
         # Fallback to direct name (will raise BrowserNotFoundError on execution if missing)
@@ -190,9 +201,16 @@ class CommandExecutor:
 
         # Build clean environment with security policies
         env = os.environ.copy()
-        if self.agent_home_dir:
-            env["USERPROFILE"] = str(self.agent_home_dir)
-            env["HOME"] = str(self.agent_home_dir)
+        socket_dir = (self.agent_home_dir / ".agent-browser") if self.agent_home_dir else Path("./reports/agent_socket").resolve()
+        socket_dir.mkdir(parents=True, exist_ok=True)
+        env["AGENT_BROWSER_SOCKET_DIR"] = str(socket_dir)
+
+        if os.name != "nt":
+            if self.agent_home_dir:
+                env["HOME"] = str(self.agent_home_dir)
+        # Note: On Windows, DO NOT overwrite USERPROFILE/HOME to prevent breaking Chrome's security tokens,
+        # GPU sandbox, and local DevTools communication.
+
         if self.allowed_domains:
             env["AGENT_BROWSER_ALLOWED_DOMAINS"] = ",".join(self.allowed_domains)
         if session_id:
@@ -226,6 +244,8 @@ class CommandExecutor:
                 partial_out, partial_err = process.communicate()
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
                 logger.error("Agent Browser command timed out: %s", " ".join(cmd))
+                if session_id:
+                    self._kill_session_daemon(session_id)
                 raise BrowserTimeoutError(
                     command=cmd,
                     timeout_seconds=resolved_timeout,
@@ -314,3 +334,40 @@ class CommandExecutor:
             )
 
         return result
+
+    def _kill_session_daemon(self, session_id: str) -> None:
+        """Forcefully kills any orphaned daemon process for a session and removes stale socket files."""
+        socket_dirs = []
+        if hasattr(self, "agent_home_dir") and self.agent_home_dir:
+            socket_dirs.append(Path(self.agent_home_dir) / ".agent-browser")
+            socket_dirs.append(Path(self.agent_home_dir))
+        socket_dirs.append(Path("./reports/agent_socket").resolve())
+        socket_dirs.append(Path("./reports/agent_home/.agent-browser").resolve())
+
+        for sdir in socket_dirs:
+            if not sdir.exists():
+                continue
+            pid_file = sdir / f"{session_id}.pid"
+            if pid_file.exists():
+                try:
+                    pid_str = pid_file.read_text(encoding="utf-8").strip()
+                    if pid_str.isdigit():
+                        pid = int(pid_str)
+                        if os.name == "nt":
+                            subprocess.run(
+                                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                                capture_output=True,
+                                timeout=5,
+                            )
+                        else:
+                            os.kill(pid, 9)
+                except Exception as e:
+                    logger.debug("Could not terminate daemon PID for session %s: %s", session_id, e)
+
+            for ext in (".pid", ".port", ".config", ".stream", ".version", ".engine", ".target"):
+                f = sdir / f"{session_id}{ext}"
+                if f.exists():
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
