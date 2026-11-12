@@ -91,10 +91,11 @@ export function ExecutionLogsPage({ projectId, onNavigate }: ExecutionLogsPagePr
   };
 
   const filtered = logs.filter((l) => {
-    const matchesSearch =
-      l.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.execution_id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLevel = levelFilter === "all" || l.level === levelFilter;
+    const q = (searchQuery || "").trim().toLowerCase();
+    const msg = (l?.message || "").toLowerCase();
+    const execId = (l?.execution_id || "").toLowerCase();
+    const matchesSearch = !q || msg.includes(q) || execId.includes(q);
+    const matchesLevel = levelFilter === "all" || l?.level === levelFilter;
     return matchesSearch && matchesLevel;
   });
 

@@ -50,6 +50,8 @@ class BrowserSession:
 class SessionManager:
     """Manages browser sessions and guarantees isolation across concurrent executions."""
 
+    _shared_active_sessions: dict[str, BrowserSession] = {}
+
     def __init__(
         self,
         executor: CommandExecutor | None = None,
@@ -57,7 +59,7 @@ class SessionManager:
     ) -> None:
         self.executor = executor or CommandExecutor(agent_home_dir=f"{base_storage_dir}/agent_home")
         self.base_storage_dir = Path(base_storage_dir).resolve()
-        self._active_sessions: dict[str, BrowserSession] = {}
+        self._active_sessions = SessionManager._shared_active_sessions
 
     def create_session(
         self,

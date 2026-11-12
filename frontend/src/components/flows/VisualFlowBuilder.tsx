@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -313,6 +313,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
   const defaultNodes: Node[] = initialDefinition?.nodes || [];
   const defaultEdges: Edge[] = initialDefinition?.edges || [];
 
+  const [activeFlowId, setActiveFlowId] = useState<string | null>(flowId || null);
   const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>("node_1");
@@ -326,6 +327,117 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
   const { success, error, warning, info } = useToast();
   const { confirm } = useConfirm();
+
+  // Sync flowId prop to activeFlowId
+  useEffect(() => {
+    if (flowId) {
+      setActiveFlowId(flowId);
+    }
+  }, [flowId]);
+
+  // Load flow definition when activeFlowId or initialDefinition changes
+  useEffect(() => {
+    if (activeFlowId) {
+      flowsApi
+        .get(activeFlowId)
+        .then((flow) => {
+          if (!flow) return;
+          if (flow.name) setName(flow.name);
+          const def = flow.definition || flow.current_version?.definition_json;
+          if (def && Array.isArray(def.nodes) && def.nodes.length > 0) {
+            const loadedNodes: Node[] = def.nodes.map((n: any, idx: number) => ({
+              id: n.id,
+              type: n.type || "action",
+              position: n.position || { x: 250, y: (idx + 1) * 90 },
+              data: {
+                action: n.action,
+                config: n.config || {},
+                summary:
+                  n.config?.url ||
+                  n.config?.logical_id ||
+                  n.config?.target?.selector ||
+                  n.config?.selector ||
+                  n.action ||
+                  "",
+              },
+            }));
+            const loadedEdges: Edge[] = (def.edges || []).map((e: any) => ({
+              id: e.id,
+              source: e.source,
+              target: e.target,
+              sourceHandle: e.source_handle || e.sourceHandle || null,
+            }));
+            setNodes(loadedNodes);
+            setEdges(loadedEdges);
+            if (loadedNodes.length > 0) {
+              setSelectedNodeId(loadedNodes[0].id);
+            }
+          }
+        })
+        .catch((err) => {
+          console.warn("Could not load flow:", err);
+        });
+    } else if (initialDefinition && Array.isArray(initialDefinition.nodes) && initialDefinition.nodes.length > 0) {
+      if (initialDefinition.name) setName(initialDefinition.name);
+      const loadedNodes: Node[] = initialDefinition.nodes.map((n: any, idx: number) => ({
+        id: n.id,
+        type: n.type || "action",
+        position: n.position || { x: 250, y: (idx + 1) * 90 },
+        data: {
+          action: n.action,
+          config: n.config || {},
+          summary:
+            n.config?.url ||
+            n.config?.logical_id ||
+            n.config?.target?.selector ||
+            n.config?.selector ||
+            n.action ||
+            "",
+        },
+      }));
+      const loadedEdges: Edge[] = (initialDefinition.edges || []).map((e: any) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.source_handle || e.sourceHandle || null,
+      }));
+      setNodes(loadedNodes);
+      setEdges(loadedEdges);
+      if (loadedNodes.length > 0) {
+        setSelectedNodeId(loadedNodes[0].id);
+      }
+    } else if (nodes.length === 0) {
+      // Sensible initial flow for new workflows
+      const starterNodes: Node[] = [
+        {
+          id: "node_1",
+          type: "action",
+          position: { x: 250, y: 100 },
+          data: {
+            action: "navigate",
+            config: { url: "https://example.com", timeout: 30, wait_until: "load" },
+            summary: "https://example.com",
+          },
+        },
+        {
+          id: "node_2",
+          type: "stop",
+          position: { x: 250, y: 220 },
+          data: {
+            action: "stop",
+            config: { reason: "Flow completed successfully" },
+            summary: "Stop",
+          },
+        },
+      ];
+      const starterEdges: Edge[] = [
+        { id: "e_1_2", source: "node_1", target: "node_2" },
+      ];
+      setNodes(starterNodes);
+      setEdges(starterEdges);
+      setSelectedNodeId("node_1");
+    }
+  }, [activeFlowId]);
 
   const onConnect = useCallback((params: any) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
@@ -463,6 +575,37 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
     });
   };
 
+  // Helper to compile clean FlowGraphDefinition payload
+  const compileFlowDefinition = () => {
+    return {
+      name,
+      start_node_id: nodes[0]?.id || "node_1",
+      nodes: nodes.map((n) => {
+        const cfg = (n.data?.config as Record<string, any>) || {};
+        const sel = cfg.selector || cfg.target?.selector;
+        return {
+          id: n.id,
+          type: n.type || "action",
+          action: n.data?.action,
+          config: {
+            ...cfg,
+            target: sel ? { selector: sel, logical_id: cfg.logical_id, fallbacks: cfg.fallbacks || [] } : cfg.target,
+            selector: sel,
+            value: cfg.value !== undefined ? cfg.value : (cfg.value_template !== undefined ? cfg.value_template : cfg.text),
+            value_template: cfg.value_template !== undefined ? cfg.value_template : cfg.value,
+          },
+          position: n.position,
+        };
+      }),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        source_handle: e.sourceHandle || (e as any).source_handle || null,
+      })),
+    };
+  };
+
   // Validate Flow DAG with backend engine
   const handleValidateDAG = async () => {
     if (nodes.length === 0) {
@@ -470,23 +613,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
       return;
     }
 
-    const flowDef = {
-      name,
-      start_node_id: nodes[0]?.id,
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        action: n.data.action,
-        config: n.data.config || {},
-        position: n.position,
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        source_handle: e.sourceHandle || null,
-      })),
-    };
+    const flowDef = compileFlowDefinition();
 
     try {
       const res = await flowsApi.validate(flowDef);
@@ -502,32 +629,24 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
   // Save Draft to PostgreSQL
   const handleSaveDraft = async () => {
+    if (nodes.length === 0) {
+      error("Cannot Save", "Add at least one node to canvas before saving.");
+      return;
+    }
     setSaving(true);
-    const flowDef = {
-      name,
-      start_node_id: nodes[0]?.id,
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        action: n.data.action,
-        config: n.data.config || {},
-        position: n.position,
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        source_handle: e.sourceHandle || null,
-      })),
-    };
+    const flowDef = compileFlowDefinition();
 
     try {
-      if (flowId) {
-        await flowsApi.update(flowId, { name, definition: flowDef });
+      if (activeFlowId) {
+        await flowsApi.update(activeFlowId, { name, definition: flowDef });
+        success("Draft Saved", `Updated flow '${name}' in PostgreSQL.`);
       } else {
-        await flowsApi.create({ project_id: projectId, name, definition: flowDef });
+        const created = await flowsApi.create({ project_id: projectId, name, definition: flowDef });
+        if (created && created.id) {
+          setActiveFlowId(created.id);
+        }
+        success("Draft Saved", `Created flow '${name}' in PostgreSQL.`);
       }
-      success("Draft Saved", "Flow definition stored in PostgreSQL.");
       if (onSaveSuccess) onSaveSuccess();
     } catch (err: any) {
       error("Save Failed", err.message || "Could not save flow draft.");
@@ -538,13 +657,16 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
   // Publish Immutable Version
   const handlePublish = async () => {
-    if (!flowId) {
-      warning("Save Draft First", "Please save the draft before publishing an immutable version.");
-      return;
-    }
     setSaving(true);
     try {
-      await flowsApi.publish(flowId);
+      let fid = activeFlowId;
+      if (!fid) {
+        const flowDef = compileFlowDefinition();
+        const created = await flowsApi.create({ project_id: projectId, name, definition: flowDef });
+        fid = created.id;
+        setActiveFlowId(created.id);
+      }
+      await flowsApi.publish(fid!);
       success("Flow Published", "Created immutable published definition with SHA-256 checksum.");
     } catch (err: any) {
       error("Publishing Failed", err.message || "Failed to publish flow.");
@@ -555,32 +677,91 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
 
   // Execute Flow DAG via Agent Browser
   const handleExecute = async () => {
+    if (nodes.length === 0) {
+      error("Cannot Execute", "Canvas has no nodes to execute.");
+      return;
+    }
     setExecuting(true);
     setConsoleOpen(true);
     setConsoleLogs([
-      { step: "Init", action: "Session", status: "running", duration: "0.2s", error: null, time: "Just now" },
+      { step: "Init", action: "Preparing Session", status: "running", duration: "0.1s", error: null, time: new Date().toLocaleTimeString() },
     ]);
     info("Execution Dispatched", `Agent Browser worker started for flow '${name}'.`);
 
     try {
-      if (flowId) {
-        await flowsApi.execute(flowId);
+      let fid = activeFlowId;
+      // Always persist current draft before execution
+      const flowDef = compileFlowDefinition();
+      if (fid) {
+        await flowsApi.update(fid, { name, definition: flowDef });
+      } else {
+        const created = await flowsApi.create({ project_id: projectId, name, definition: flowDef });
+        fid = created.id;
+        setActiveFlowId(created.id);
       }
-      // Populate realistic live execution console steps
-      setTimeout(() => {
-        setConsoleLogs([
-          { step: "Step 1", action: "navigate", status: "passed", duration: "1.2s", error: null, time: "Just now" },
-          { step: "Step 2", action: "fill", status: "passed", duration: "0.4s", error: null, time: "Just now" },
-          { step: "Step 3", action: "click", status: "passed", duration: "0.6s", error: null, time: "Just now" },
-          { step: "Step 4", action: "screenshot", status: "passed", duration: "0.8s", error: null, time: "Just now" },
-          { step: "Stop", action: "stop", status: "passed", duration: "0.1s", error: null, time: "Just now" },
-        ]);
-        setExecuting(false);
-        success("Execution Passed", "All 5 nodes executed successfully via agent-browser CLI.");
-      }, 2000);
+
+      // Execute flow synchronously for real-time console feedback
+      const exec = await flowsApi.execute(fid!, { async_exec: false });
+
+      // Parse real execution steps from backend response
+      const steps = exec?.steps || [];
+      const logs = steps.map((s: any, idx: number) => ({
+        step: `Step ${s.step_index ?? idx + 1} (${s.node_id})`,
+        action: s.action || s.step_type || "action",
+        status: s.status || "passed",
+        duration: s.duration_ms ? `${(s.duration_ms / 1000).toFixed(2)}s` : "0.1s",
+        error: s.error_message || null,
+        time: new Date().toLocaleTimeString(),
+      }));
+
+      if (logs.length === 0) {
+        logs.push({
+          step: "Execution",
+          action: "flow",
+          status: exec?.status === "failed" ? "failed" : "passed",
+          duration: exec?.duration_ms ? `${(exec.duration_ms / 1000).toFixed(2)}s` : "0.5s",
+          error: exec?.summary?.error || null,
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      setConsoleLogs(logs);
+
+      // Update node visual status on the canvas
+      setNodes((nds) =>
+        nds.map((n) => {
+          const matchingStep = steps.find((s: any) => s.node_id === n.id);
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              executionStatus: matchingStep ? matchingStep.status : undefined,
+            },
+          };
+        })
+      );
+
+      if (exec?.status === "failed") {
+        error("Execution Failed", exec.summary?.error || "Workflow step failed.");
+      } else {
+        const dur = exec?.duration_ms ? `${(exec.duration_ms / 1000).toFixed(2)}s` : "";
+        success("Execution Passed", `Flow completed successfully ${dur ? `in ${dur}` : ""}.`);
+      }
     } catch (err: any) {
-      setExecuting(false);
+      setConsoleLogs((prev) => [
+        ...prev,
+        {
+          step: "Error",
+          action: "system",
+          status: "failed",
+          duration: "0s",
+          error: err.message || "Failed to execute flow",
+          time: new Date().toLocaleTimeString(),
+        },
+      ]);
       error("Execution Failed", err.message || "Execution encountered an error.");
+    } finally {
+      setExecuting(false);
     }
   };
 

@@ -92,7 +92,7 @@ export const flowsApi = {
   publish: (id: string) => request<any>(`/api/v1/flows/${id}/publish`, { method: "POST" }),
   validate: (definition: any) =>
     request<any>("/api/v1/flows/validate", { method: "POST", body: { definition } }),
-  execute: (id: string, data?: { version_id?: string; initial_variables?: Record<string, any> }) =>
+  execute: (id: string, data?: { version_id?: string; initial_variables?: Record<string, any>; async_exec?: boolean; environment_id?: string }) =>
     request<any>(`/api/v1/flows/${id}/execute`, { method: "POST", body: data || {} }),
   delete: (id: string) =>
     request<void>(`/api/v1/flows/${id}`, { method: "DELETE" }),

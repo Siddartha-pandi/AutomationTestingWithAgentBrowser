@@ -194,11 +194,13 @@ export function SchedulesPage({ projectId, onNavigate }: SchedulesPageProps) {
     });
   };
 
-  const filtered = schedules.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.target_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = schedules.filter((s) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (s?.name || "").toLowerCase();
+    const targetStr = (s?.target_name || "").toLowerCase();
+    return nameStr.includes(q) || targetStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

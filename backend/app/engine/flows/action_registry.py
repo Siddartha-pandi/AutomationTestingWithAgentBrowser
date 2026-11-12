@@ -65,6 +65,18 @@ class ActionRegistry:
         self.wait_engine = WaitEngine(adapter)
         self.retry_executor = RetryExecutor(adapter)
 
+    def _get_target_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Extracts element target configuration supporting both nested and top-level definitions."""
+        target = config.get("target")
+        if isinstance(target, dict) and (target.get("selector") or target.get("logical_id") or target.get("element_profile_id")):
+            return target
+        return {
+            "selector": config.get("selector") or (target.get("selector") if isinstance(target, dict) else "") or "",
+            "logical_id": config.get("logical_id") or (target.get("logical_id") if isinstance(target, dict) else None),
+            "fallbacks": config.get("fallbacks") or (target.get("fallbacks") if isinstance(target, dict) else []) or [],
+            "element_profile_id": config.get("element_profile_id") or (target.get("element_profile_id") if isinstance(target, dict) else None),
+        }
+
     def resolve_target_selector(
         self,
         session_id: str,
@@ -77,6 +89,9 @@ class ActionRegistry:
 
         Returns (resolved_selector, healed_locator_or_None).
         """
+        if not target_config.get("selector") and not target_config.get("logical_id") and not target_config.get("element_profile_id"):
+            target_config = self._get_target_config(target_config)
+
         logical_id = target_config.get("logical_id")
         element_profile_id = target_config.get("element_profile_id")
         raw_selector = target_config.get("selector") or ""
@@ -246,9 +261,9 @@ class ActionRegistry:
     def _handle_fill(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
     ) -> StepExecutionResult:
-        target = config.get("target") or {}
-        raw_val = config.get("value", "")
-        interpolated_val = str(scope.interpolate(raw_val))
+        target = self._get_target_config(config)
+        raw_val = config.get("value") if config.get("value") is not None else (config.get("value_template") or config.get("text") or "")
+        interpolated_val = str(scope.interpolate(str(raw_val)))
         is_secret = bool(config.get("is_secret", False))
 
         if is_secret:
@@ -266,8 +281,9 @@ class ActionRegistry:
     def _handle_type(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
     ) -> StepExecutionResult:
-        target = config.get("target") or {}
-        text = str(scope.interpolate(config.get("text", "")))
+        target = self._get_target_config(config)
+        raw_text = config.get("text") if config.get("text") is not None else (config.get("value") or config.get("value_template") or "")
+        text = str(scope.interpolate(str(raw_text)))
         selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="type", execution_id=execution_id)
         self.adapter.fill(session_id, selector=selector, text=text)
         return StepExecutionResult(status="passed", result_data={"selector": selector, "typed": True}, healed_locator=healed_loc)
@@ -275,8 +291,9 @@ class ActionRegistry:
     def _handle_select(
         self, session_id: str, config: dict[str, Any], scope: VariableScope, execution_id: UUID | None
     ) -> StepExecutionResult:
-        target = config.get("target") or {}
-        value = str(scope.interpolate(config.get("value", "")))
+        target = self._get_target_config(config)
+        raw_val = config.get("value") if config.get("value") is not None else (config.get("option_value") or "")
+        value = str(scope.interpolate(str(raw_val)))
         selector, healed_loc = self.resolve_target_selector(session_id, target, action_name="select", execution_id=execution_id)
         self.adapter.select(session_id, selector=selector, value=value)
         return StepExecutionResult(status="passed", result_data={"selector": selector, "value": value}, healed_locator=healed_loc)

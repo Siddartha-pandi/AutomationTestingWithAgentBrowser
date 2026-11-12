@@ -117,11 +117,15 @@ export function AllFlowsPage({ projectId, onNavigate, onSelectFlow }: AllFlowsPa
 
   // Filter and pagination
   const filteredFlows = flows.filter((f) => {
-    const matchesSearch =
-      f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (f.description && f.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || f.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchesEnv = environmentFilter === "all" || (f.environment && f.environment.toLowerCase() === environmentFilter.toLowerCase());
+    const q = (searchQuery || "").trim().toLowerCase();
+    const nameStr = (f?.name || "").toLowerCase();
+    const descStr = (f?.description || "").toLowerCase();
+    const statusStr = (f?.status || "").toLowerCase();
+    const envStr = (f?.environment || "").toLowerCase();
+
+    const matchesSearch = !q || nameStr.includes(q) || descStr.includes(q);
+    const matchesStatus = statusFilter === "all" || statusStr === statusFilter.toLowerCase();
+    const matchesEnv = environmentFilter === "all" || envStr === environmentFilter.toLowerCase();
     return matchesSearch && matchesStatus && matchesEnv;
   });
 

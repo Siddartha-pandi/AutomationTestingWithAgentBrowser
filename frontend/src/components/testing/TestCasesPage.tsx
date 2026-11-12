@@ -102,12 +102,13 @@ export function TestCasesPage({ projectId, onNavigate, onSelectTest }: TestCases
   };
 
   const filteredTests = tests.filter((t) => {
-    const matchesSearch =
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.test_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || t.last_result === statusFilter;
-    const matchesSuite = suiteFilter === "all" || t.suite_name === suiteFilter;
+    const q = (searchQuery || "").trim().toLowerCase();
+    const nameStr = (t?.name || "").toLowerCase();
+    const idStr = (t?.test_id || "").toLowerCase();
+    const descStr = (t?.description || "").toLowerCase();
+    const matchesSearch = !q || nameStr.includes(q) || idStr.includes(q) || descStr.includes(q);
+    const matchesStatus = statusFilter === "all" || t?.last_result === statusFilter;
+    const matchesSuite = suiteFilter === "all" || t?.suite_name === suiteFilter;
     return matchesSearch && matchesStatus && matchesSuite;
   });
 

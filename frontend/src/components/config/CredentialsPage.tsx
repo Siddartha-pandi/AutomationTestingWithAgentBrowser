@@ -208,11 +208,13 @@ export function CredentialsPage({ projectId, onNavigate }: CredentialsPageProps)
     });
   };
 
-  const filtered = credentials.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.domain_scope.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = credentials.filter((c) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (c?.name || "").toLowerCase();
+    const scopeStr = (c?.domain_scope || "").toLowerCase();
+    return nameStr.includes(q) || scopeStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

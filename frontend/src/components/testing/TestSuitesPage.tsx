@@ -199,11 +199,13 @@ export function TestSuitesPage({ projectId, onNavigate }: TestSuitesPageProps) {
     });
   };
 
-  const filteredSuites = suites.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSuites = suites.filter((s) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (s?.name || "").toLowerCase();
+    const descStr = (s?.description || "").toLowerCase();
+    return nameStr.includes(q) || descStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

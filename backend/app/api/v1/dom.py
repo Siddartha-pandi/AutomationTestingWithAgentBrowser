@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from backend.app.api.v1.browser import _browser_adapter
 from backend.app.browser import AgentBrowserAdapter
 from backend.app.intelligence.dom_extractor import DOMExtractor
 from backend.app.schemas.intelligence import DOMExtractRequest, DOMExtractResponse
@@ -16,15 +17,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dom", tags=["DOM Intelligence"])
 
-# Shared adapter instance for API extraction requests
-_adapter: AgentBrowserAdapter | None = None
-
 
 def get_browser_adapter() -> AgentBrowserAdapter:
-    global _adapter
-    if _adapter is None:
-        _adapter = AgentBrowserAdapter()
-    return _adapter
+    return _browser_adapter
 
 
 @router.post("/extract", response_model=DOMExtractResponse)

@@ -89,7 +89,7 @@ class ElementTarget(BaseModel):
 class FlowNode(BaseModel):
     """Visual workflow canvas node (React Flow compatible)."""
 
-    id: str = Field(min_length=1, max_length=64)
+    id: str = Field(min_length=1, max_length=128)
     type: str = Field(default="action", pattern="^(action|condition|loop|trigger|branch|stop)$")
     action: FlowActionType | None = None
     config: dict[str, Any] = Field(default_factory=dict)
@@ -107,9 +107,9 @@ class FlowNode(BaseModel):
 class FlowEdge(BaseModel):
     """Visual workflow canvas edge connecting nodes (React Flow compatible)."""
 
-    id: str = Field(min_length=1, max_length=64)
-    source: str = Field(min_length=1, max_length=64)
-    target: str = Field(min_length=1, max_length=64)
+    id: str = Field(min_length=1, max_length=128)
+    source: str = Field(min_length=1, max_length=128)
+    target: str = Field(min_length=1, max_length=128)
     source_handle: str | None = None  # e.g., 'true', 'false', 'default', 'loop_body', 'loop_exit'
     label: str | None = None
 
@@ -121,10 +121,22 @@ class FlowGraphDefinition(BaseModel):
 
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=1000)
-    start_node_id: str = Field(min_length=1, max_length=64)
+    start_node_id: str | None = Field(default=None, max_length=128)
     nodes: list[FlowNode] = Field(min_length=1)
     edges: list[FlowEdge] = Field(default_factory=list)
     variables: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_default_start_node(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("start_node_id") and data.get("nodes"):
+                first_node = data["nodes"][0]
+                if isinstance(first_node, dict) and "id" in first_node:
+                    data["start_node_id"] = str(first_node["id"])
+                elif hasattr(first_node, "id"):
+                    data["start_node_id"] = str(first_node.id)
+        return data
 
     @model_validator(mode="after")
     def validate_graph_topology(self) -> FlowGraphDefinition:
@@ -135,6 +147,9 @@ class FlowGraphDefinition(BaseModel):
             raise ValueError("Duplicate node IDs found in flow graph")
 
         # 2. Start node must exist
+        if not self.start_node_id:
+            self.start_node_id = self.nodes[0].id
+
         if self.start_node_id not in node_ids:
             raise ValueError(f"Start node ID '{self.start_node_id}' does not exist in flow graph nodes")
 

@@ -9,12 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.api.v1.browser import _browser_adapter, get_verified_session
 from backend.app.api.v1.projects import resolve_project_id
-from backend.app.browser import AgentBrowserAdapter
 from backend.app.db.session import get_db
 from backend.app.models.automation import AutomationDefinition, DefinitionVersion
 from backend.app.models.user import User
@@ -25,9 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/recorder", tags=["Browser Recorder"])
 
-_browser_adapter = AgentBrowserAdapter()
-
-# Active in-memory recorder sessions: { session_id: { "project_id": str, "url": str, "actions": list } }
+# Active in-memory recorder sessions: { session_id: { "project_id": str, "user_id": str, "url": str, "actions": list } }
 _ACTIVE_RECORDINGS: dict[str, dict[str, Any]] = {}
 
 
@@ -38,7 +37,7 @@ class StartRecorderPayload(BaseModel):
 
 class RecordActionPayload(BaseModel):
     session_id: str
-    action: str  # navigate, click, fill, type, select, check, radio, scroll
+    action: str  # navigate, click, fill, type, select, check, radio, scroll, hover, dblclick, reload, back, forward
     selector: str = ""
     value: str | None = None
 
@@ -59,20 +58,49 @@ class SaveRecordingPayload(BaseModel):
 def start_recorder(
     payload: StartRecorderPayload,
     current_user: User = Depends(require_permission("tests:create_edit")),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Starts a browser recording session using isolated Agent Browser subprocess."""
+    proj = resolve_project_id(
+        db,
+        payload.project_id,
+        current_user.id,
+        is_superuser=getattr(current_user, "is_superuser", False),
+    )
+    if not proj and getattr(current_user, "is_superuser", False):
+        from backend.app.models.project import Project
+        proj = db.query(Project).first()
+    if not proj:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target project workspace not found.")
+
+    try:
+        parsed = urlparse(payload.target_url)
+    except Exception as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid target URL: {err}")
+
+    hostname = (parsed.hostname or "").strip().lower()
+    if not hostname:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid target URL: missing hostname.")
+
+    allowed_domains = [hostname]
+    parts = hostname.split(".")
+    if len(parts) >= 2:
+        allowed_domains.append(f"*.{'.'.join(parts[-2:])}")
+
     session_id = f"rec_{uuid.uuid4().hex[:12]}"
     try:
         session = _browser_adapter.launch(
             session_id=session_id,
-            project_id=payload.project_id,
-            allowed_domains=["*"],
+            project_id=str(proj.id),
+            user_id=str(current_user.id),
+            allowed_domains=allowed_domains,
         )
         # Navigate to initial URL
         _browser_adapter.navigate(session_id=session_id, url=payload.target_url)
 
         _ACTIVE_RECORDINGS[session_id] = {
-            "project_id": payload.project_id,
+            "project_id": str(proj.id),
+            "user_id": str(current_user.id),
             "url": payload.target_url,
             "started_at": datetime.now(timezone.utc).isoformat(),
             "actions": [
@@ -106,6 +134,10 @@ def start_recorder(
             "action_count": 1,
         }
     except Exception as err:
+        try:
+            _browser_adapter.close(session_id)
+        except Exception:
+            pass
         logger.error("Failed to start recorder session: %s", err)
         raise HTTPException(status_code=500, detail=str(err))
 
@@ -114,8 +146,10 @@ def start_recorder(
 def get_recorder_status(
     session_id: str,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Retrieves the active recorded action list and session status."""
+    get_verified_session(session_id, current_user, db)
     rec = _ACTIVE_RECORDINGS.get(session_id)
     if not rec:
         raise HTTPException(status_code=404, detail="Recorder session not found or expired.")
@@ -133,9 +167,11 @@ def get_recorder_status(
 def record_action(
     payload: RecordActionPayload,
     current_user: User = Depends(require_permission("tests:create_edit")),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Executes and logs a recorded action in the active recording session."""
     sess = payload.session_id
+    get_verified_session(sess, current_user, db)
     rec = _ACTIVE_RECORDINGS.get(sess)
     if not rec:
         raise HTTPException(status_code=404, detail="Recorder session not active.")
@@ -143,7 +179,7 @@ def record_action(
     act = payload.action.lower()
     sel = payload.selector
     try:
-        # Dispatch action through Agent Browser
+        # Dispatch action through Agent Browser using native commands
         if act == "click":
             res = _browser_adapter.click(sess, sel)
         elif act in ("dblclick", "double_click"):
@@ -158,11 +194,14 @@ def record_action(
             res = _browser_adapter.select(sess, sel, payload.value or "")
         elif act == "hover":
             res = _browser_adapter.hover(sess, sel)
-        elif act in ("check", "uncheck", "radio"):
-            res = _browser_adapter.click(sess, sel)
+        elif act == "check":
+            res = _browser_adapter.check(sess, sel)
+        elif act == "uncheck":
+            res = _browser_adapter.uncheck(sess, sel)
+        elif act == "radio":
+            res = _browser_adapter.radio(sess, sel)
         elif act == "scroll":
-            _browser_adapter.evaluate(sess, "window.scrollBy(0, 400);")
-            res = _browser_adapter.click(sess, "body")
+            res = _browser_adapter.scroll(sess, 0, 400)
         elif act == "reload":
             res = _browser_adapter.reload(sess)
         elif act == "back":
@@ -199,6 +238,8 @@ def record_action(
             "image_base64": img_b64,
             "screenshot_path": shot.file_path,
         }
+    except HTTPException:
+        raise
     except Exception as err:
         logger.error("Failed executing recorded action: %s", err)
         raise HTTPException(status_code=500, detail=str(err))
@@ -208,10 +249,15 @@ def record_action(
 def stop_recorder(
     payload: StopRecorderPayload,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Stops the recorder and closes the browser subprocess."""
     sess = payload.session_id
     rec = _ACTIVE_RECORDINGS.get(sess)
+    try:
+        get_verified_session(sess, current_user, db)
+    except Exception:
+        pass
     try:
         _browser_adapter.close(session_id=sess)
     except Exception:
@@ -230,8 +276,10 @@ def stop_recorder(
 def inspect_recorder_page(
     session_id: str,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Inspects interactive elements on current page for the recorder."""
+    get_verified_session(session_id, current_user, db)
     try:
         elements = _browser_adapter.extract_dom(session_id=session_id, max_depth=6)
         interactive = []
@@ -286,7 +334,15 @@ def save_recording(
     if not actions:
         raise HTTPException(status_code=400, detail="Cannot save empty recording session.")
 
-    proj = resolve_project_id(db, payload.project_id, current_user.id)
+    proj = resolve_project_id(
+        db,
+        payload.project_id,
+        current_user.id,
+        is_superuser=getattr(current_user, "is_superuser", False),
+    )
+    if not proj and getattr(current_user, "is_superuser", False):
+        from backend.app.models.project import Project
+        proj = db.query(Project).first()
     if not proj:
         raise HTTPException(status_code=404, detail="Target project workspace not found.")
     project_uuid = proj.id
@@ -303,7 +359,9 @@ def save_recording(
                 "config": {
                     "url": act["selector"] if act["action"] == "navigate" else None,
                     "target": {"selector": act["selector"]} if act["action"] != "navigate" else None,
+                    "selector": act["selector"] if act["action"] != "navigate" else None,
                     "value": act.get("value"),
+                    "value_template": act.get("value"),
                 },
                 "position": {"x": 100 + idx * 240, "y": 150},
             })

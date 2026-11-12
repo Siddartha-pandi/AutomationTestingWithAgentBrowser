@@ -37,7 +37,55 @@ export function ExecutionHistoryPage({ projectId, onNavigate, onSelectExecution 
     setLoading(true);
     try {
       const list = await executionsApi.list({ projectId });
-      setExecutions(list || []);
+      const rawList = Array.isArray(list) ? list : [];
+      const normalized = rawList.map((e: any) => {
+        const id = String(e?.id || "");
+        const name =
+          e?.name ||
+          e?.summary?.name ||
+          e?.definition_name ||
+          (id ? `Execution ${id.slice(0, 8)}` : "Execution Run");
+        const type =
+          e?.type ||
+          e?.summary?.type ||
+          (e?.trigger_type === "manual" ? "flow" : e?.trigger_type) ||
+          "flow";
+        const status = (e?.status || "queued").toString().toLowerCase();
+        const environment =
+          e?.environment ||
+          e?.environment_name ||
+          (e?.environment_id ? "Custom" : "Default");
+        const version =
+          e?.version ||
+          (e?.definition_version_id
+            ? String(e.definition_version_id).slice(0, 8)
+            : "v1.0");
+        const trigger = e?.trigger || e?.trigger_type || "manual";
+        const duration =
+          e?.duration ||
+          (typeof e?.duration_ms === "number"
+            ? `${(e.duration_ms / 1000).toFixed(1)}s`
+            : "-");
+        const started_at = e?.started_at
+          ? new Date(e.started_at).toLocaleString()
+          : e?.created_at
+          ? new Date(e.created_at).toLocaleString()
+          : "-";
+
+        return {
+          ...e,
+          id,
+          name,
+          type,
+          status,
+          environment,
+          version,
+          trigger,
+          duration,
+          started_at,
+        };
+      });
+      setExecutions(normalized);
     } catch {
       setExecutions([]);
     } finally {
@@ -60,43 +108,56 @@ export function ExecutionHistoryPage({ projectId, onNavigate, onSelectExecution 
   const { confirm } = useConfirm();
 
   const handleRerun = (exec: any) => {
+    const execName = exec?.name || (exec?.id ? `Execution ${String(exec.id).slice(0, 8)}` : "Execution");
+    const execVer = exec?.version || "latest";
+    const execEnv = exec?.environment || "Default";
     confirm({
       title: "Rerun Pinned Execution",
-      message: `Execute '${exec.name}' pinned to immutable version '${exec.version}' in '${exec.environment}'?`,
+      message: `Execute '${execName}' pinned to immutable version '${execVer}' in '${execEnv}'?`,
       confirmText: "Trigger Rerun",
       variant: "primary",
       onConfirm: () => {
-        info("Rerun Dispatched", `Started background worker for ${exec.name}.`);
+        info("Rerun Dispatched", `Started background worker for ${execName}.`);
         onNavigate("executions_running");
       },
     });
   };
 
   const handleDeleteExecution = (exec: any) => {
+    const execName = exec?.name || (exec?.id ? `Execution ${String(exec.id).slice(0, 8)}` : "Execution");
+    const execId = String(exec?.id || "");
     confirm({
       title: "Delete Execution Record",
-      message: `Permanently delete execution run record for '${exec.name}' (Run ID: ${exec.id})? Associated telemetry and run reports will be deleted.`,
+      message: `Permanently delete execution run record for '${execName}' (Run ID: ${execId})? Associated telemetry and run reports will be deleted.`,
       confirmText: "Delete Record",
       variant: "danger",
       onConfirm: async () => {
         try {
-          await executionsApi.delete(exec.id);
+          if (execId) {
+            await executionsApi.delete(execId);
+          }
         } catch {
           // Fallback optimistic
         }
-        setExecutions((prev) => prev.filter((e) => e.id !== exec.id));
-        success("Execution Record Deleted", `Removed run ${exec.id}.`);
+        setExecutions((prev) => prev.filter((e) => e?.id !== execId));
+        success("Execution Record Deleted", `Removed run ${execId}.`);
       },
     });
   };
 
   const filtered = executions.filter((e) => {
-    const matchesSearch =
-      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === "all" || e.type.toLowerCase() === typeFilter.toLowerCase();
-    const matchesStatus = statusFilter === "all" || e.status.toLowerCase() === statusFilter.toLowerCase();
-    const matchesEnv = envFilter === "all" || e.environment.toLowerCase() === envFilter.toLowerCase();
+    if (!e) return false;
+    const q = (searchQuery || "").trim().toLowerCase();
+    const nameStr = (e.name || e.summary?.name || e.definition_name || "").toString().toLowerCase();
+    const idStr = (e.id || "").toString().toLowerCase();
+    const typeStr = (e.type || e.summary?.type || (e.trigger_type === "manual" ? "flow" : e.trigger_type) || "flow").toString().toLowerCase();
+    const statusStr = (e.status || "queued").toString().toLowerCase();
+    const envStr = (e.environment || e.environment_name || (e.environment_id ? "Custom" : "Default")).toString().toLowerCase();
+
+    const matchesSearch = !q || nameStr.includes(q) || idStr.includes(q);
+    const matchesType = typeFilter === "all" || typeStr === typeFilter.toLowerCase();
+    const matchesStatus = statusFilter === "all" || statusStr === statusFilter.toLowerCase();
+    const matchesEnv = envFilter === "all" || envStr === envFilter.toLowerCase();
     return matchesSearch && matchesType && matchesStatus && matchesEnv;
   });
 

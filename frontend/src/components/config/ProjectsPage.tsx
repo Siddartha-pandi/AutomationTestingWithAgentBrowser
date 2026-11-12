@@ -200,11 +200,13 @@ export function ProjectsPage({ currentProject, onSelectProject, onNavigate }: Pr
     });
   };
 
-  const filtered = projects.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = projects.filter((p) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (p?.name || "").toLowerCase();
+    const descStr = (p?.description || "").toLowerCase();
+    return nameStr.includes(q) || descStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

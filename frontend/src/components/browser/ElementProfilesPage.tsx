@@ -194,12 +194,14 @@ export function ElementProfilesPage({ projectId, onNavigate }: ElementProfilesPa
     });
   };
 
-  const filtered = profiles.filter(
-    (p) =>
-      p.logical_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.page_context.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = profiles.filter((p) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const logId = (p?.logical_id || "").toLowerCase();
+    const desc = (p?.description || "").toLowerCase();
+    const ctx = (p?.page_context || "").toLowerCase();
+    return logId.includes(q) || desc.includes(q) || ctx.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

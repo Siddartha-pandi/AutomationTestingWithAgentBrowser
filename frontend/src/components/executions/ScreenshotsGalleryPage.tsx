@@ -67,12 +67,14 @@ export function ScreenshotsGalleryPage({ projectId, onNavigate }: ScreenshotsGal
     });
   };
 
-  const filtered = screenshots.filter(
-    (s) =>
-      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.execution_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.step_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = screenshots.filter((s) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (s?.name || "").toLowerCase();
+    const execStr = (s?.execution_id || "").toLowerCase();
+    const stepStr = (s?.step_name || "").toLowerCase();
+    return nameStr.includes(q) || execStr.includes(q) || stepStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

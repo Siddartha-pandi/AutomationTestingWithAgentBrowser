@@ -178,12 +178,14 @@ export function UsersManagementPage({ onNavigate }: UsersManagementPageProps) {
     });
   };
 
-  const filtered = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = users.filter((u) => {
+    const q = (searchQuery || "").trim().toLowerCase();
+    if (!q) return true;
+    const nameStr = (u?.name || "").toLowerCase();
+    const emailStr = (u?.email || "").toLowerCase();
+    const roleStr = (u?.role || "").toLowerCase();
+    return nameStr.includes(q) || emailStr.includes(q) || roleStr.includes(q);
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

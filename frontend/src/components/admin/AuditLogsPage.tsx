@@ -93,11 +93,12 @@ export function AuditLogsPage({ onNavigate }: AuditLogsPageProps) {
   };
 
   const filtered = auditRecords.filter((a) => {
-    const matchesSearch =
-      a.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.resource.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesResult = resultFilter === "all" || a.result === resultFilter;
+    const q = (searchQuery || "").trim().toLowerCase();
+    const userStr = (a?.user || "").toLowerCase();
+    const actionStr = (a?.action || "").toLowerCase();
+    const resStr = (a?.resource || "").toLowerCase();
+    const matchesSearch = !q || userStr.includes(q) || actionStr.includes(q) || resStr.includes(q);
+    const matchesResult = resultFilter === "all" || a?.result === resultFilter;
     return matchesSearch && matchesResult;
   });
 
