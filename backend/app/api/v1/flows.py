@@ -558,9 +558,39 @@ def execute_flow_endpoint(
     )
 
     if payload.async_exec:
+        from backend.config import settings
+        if settings.automation_engine == "playwright":
+            try:
+                from backend.app.services.automation_client import automation_client
+                from backend.app.worker.tasks import resolve_approved_domains_for_execution
+
+                try:
+                    approved_domains = resolve_approved_domains_for_execution(db, execution)
+                except Exception:
+                    approved_domains = ["*"]
+
+                job_info = automation_client.submit_execution(
+                    execution_id=execution.id,
+                    project_id=flow.project_id,
+                    user_id=current_user.id,
+                    graph_definition=target_version.definition_json,
+                    environment_id=payload.environment_id,
+                    flow_id=flow.id,
+                    allowed_domains=approved_domains,
+                    variables=payload.initial_variables or {},
+                )
+                execution.summary = {"engine": "playwright", "job_id": job_info.get("job_id")}
+                db.commit()
+                return ExecutionDetailResponse.model_validate(execution)
+            except Exception as play_err:
+                logger.warning(
+                    "Playwright automation service dispatch unavailable (%s), falling back to Celery worker.",
+                    play_err,
+                )
+
         from backend.app.worker.tasks import execute_flow_task
         task = execute_flow_task.delay(str(execution.id), payload.initial_variables)
-        execution.summary = {"celery_task_id": task.id}
+        execution.summary = {"engine": "agent_browser", "celery_task_id": task.id}
         db.commit()
         return ExecutionDetailResponse.model_validate(execution)
 

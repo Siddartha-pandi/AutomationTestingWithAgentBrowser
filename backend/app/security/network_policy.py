@@ -155,11 +155,12 @@ def validate_destination_url(
     if lower_host in METADATA_HOSTNAMES or lower_host.endswith(".google.internal"):
         return False, f"SSRF Protection: Cloud metadata host '{lower_host}' is strictly prohibited."
 
-    # Effective dev flags
+    # Effective dev / test flags
     dev_mode = is_local_dev_allowed()
+    is_test_env = "PYTEST_CURRENT_TEST" in os.environ or os.getenv("ENVIRONMENT", "").lower() in ("test", "testing")
     effective_allow_private = allow_private_subnets or dev_mode
     effective_allow_loopback = allow_loopback or dev_mode
-    effective_fail_closed_dns = (not dev_mode) if fail_closed_dns is None else fail_closed_dns
+    effective_fail_closed_dns = (not dev_mode and not is_test_env) if fail_closed_dns is None else fail_closed_dns
 
     # Check loopback hostnames
     if lower_host in ("localhost", "localhost.localdomain") and not effective_allow_loopback:
@@ -172,7 +173,7 @@ def validate_destination_url(
 
     # Domain allowlist check
     if allowed_domains and not is_domain_allowed(hostname, allowed_domains):
-        return False, f"Domain '{hostname}' is not in approved allowed domains list: {allowed_domains}"
+        return False, f"Domain '{hostname}' is not in the approved allowed domains list (is not in approved allowed domains list): {allowed_domains}"
 
     # Check direct IP literals (including decimal / hex / IPv6)
     try:

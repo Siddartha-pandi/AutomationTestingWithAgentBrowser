@@ -278,6 +278,18 @@ const ACTION_CATALOG = [
   { action: "date_operation", label: "Date Operations", icon: Calendar, category: "Data" },
   { action: "array_operation", label: "Array Operations", icon: ListOrdered, category: "Data" },
 
+  // Assertions
+  { action: "element_visible", label: "Element Visible", icon: Eye, category: "Assertions" },
+  { action: "element_hidden", label: "Element Hidden", icon: Eye, category: "Assertions" },
+  { action: "element_enabled", label: "Element Enabled", icon: CheckCircle2, category: "Assertions" },
+  { action: "element_disabled", label: "Element Disabled", icon: XCircle, category: "Assertions" },
+  { action: "text_equals", label: "Text Equals", icon: FileText, category: "Assertions" },
+  { action: "text_contains", label: "Text Contains", icon: FileText, category: "Assertions" },
+  { action: "url_equals", label: "URL Equals", icon: Globe, category: "Assertions" },
+  { action: "url_contains", label: "URL Contains", icon: Globe, category: "Assertions" },
+  { action: "title_equals", label: "Title Equals", icon: FileText, category: "Assertions" },
+  { action: "element_count", label: "Element Count", icon: Table, category: "Assertions" },
+
   // Control Actions
   { action: "approval_gate", label: "Human Approval", icon: ShieldCheck, category: "Control" },
   { action: "stop", label: "Stop Flow", icon: XCircle, category: "Control" },
@@ -848,7 +860,7 @@ export const VisualFlowBuilder: React.FC<VisualFlowBuilderProps> = ({
             </div>
             {/* Category Filter Pills */}
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[10px] font-semibold">
-              {["All", "Browser", "Logic", "Data", "Control"].map((cat) => (
+              {["All", "Browser", "Assertions", "Logic", "Data", "Control"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCatalogCategory(cat)}

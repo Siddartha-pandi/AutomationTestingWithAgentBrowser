@@ -1,0 +1,36 @@
+# Multi-stage production Dockerfile for NestJS Playwright Automation Service
+FROM mcr.microsoft.com/playwright:v1.49.1-noble AS base
+
+WORKDIR /app
+
+# Install package dependencies
+COPY automation-service/package*.json ./
+RUN npm ci
+
+# Copy source and build
+COPY automation-service/ ./
+RUN npm run build
+
+# Production image
+FROM mcr.microsoft.com/playwright:v1.49.1-noble AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV AUTOMATION_SERVICE_PORT=3001
+ENV STORAGE_DIR=/app/reports
+
+COPY automation-service/package*.json ./
+RUN npm ci --only=production
+
+COPY --from=base /app/dist ./dist
+
+# Create reports directories with permissions
+RUN mkdir -p /app/reports/screenshots /app/reports/traces /app/reports/dom /app/reports/videos \
+    && chown -R pwuser:pwuser /app
+
+USER pwuser
+
+EXPOSE 3001
+
+CMD ["node", "dist/main"]
+

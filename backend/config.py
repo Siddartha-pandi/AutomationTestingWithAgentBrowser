@@ -54,6 +54,11 @@ class Settings:
     celery_task_always_eager: bool = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() in ("true", "1", "yes")
     celery_worker_concurrency: int = int(os.getenv("CELERY_WORKER_CONCURRENCY", "4"))
 
+    # Playwright Automation Service Integration
+    automation_engine: str = os.getenv("AUTOMATION_ENGINE", "playwright").lower()
+    automation_service_url: str = os.getenv("AUTOMATION_SERVICE_URL", "http://127.0.0.1:3001").rstrip("/")
+    internal_service_key: str = os.getenv("INTERNAL_SERVICE_KEY", "enterprise-internal-secret-service-key-32chars")
+
     def __post_init__(self) -> None:
         if self.database_url.lower().startswith("sqlite"):
             raise ValueError(

@@ -38,6 +38,8 @@ htmlcov/
 
 # Node & Next.js
 node_modules/
+automation-service/node_modules/
+automation-service/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

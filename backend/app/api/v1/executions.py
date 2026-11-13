@@ -112,6 +112,13 @@ def cancel_execution(
 
     execution.status = "cancelled"
 
+    # Revoke NestJS BullMQ job if dispatched to Playwright service
+    try:
+        from backend.app.services.automation_client import automation_client
+        automation_client.cancel_execution(str(execution.id))
+    except Exception as nest_err:
+        logger.debug("NestJS automation cancellation dispatch (non-fatal): %s", nest_err)
+
     # Revoke background Celery task if tracked
     if isinstance(execution.summary, dict) and execution.summary.get("celery_task_id"):
         try:

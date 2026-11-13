@@ -77,6 +77,13 @@ export function ExecutionDetailsPage({
             }
           } else if (payload.type === "step:complete" || payload.type === "step:failed") {
             loadExecution();
+          } else if (payload.type === "viewport:frame") {
+            const frameData = payload.data?.frame_base64 || payload.payload?.frame_base64;
+            if (frameData) {
+              setExecution((prev: any) =>
+                prev ? { ...prev, liveViewport: `data:image/jpeg;base64,${frameData}` } : prev
+              );
+            }
           } else if (payload.type === "console:log") {
             setExecution((prev: any) => {
               if (!prev) return prev;
@@ -278,10 +285,33 @@ export function ExecutionDetailsPage({
 
             <div className="p-4 rounded-xl bg-white dark:bg-[#161F30] border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[10px] font-bold text-slate-400 uppercase">Browser Engine</span>
-              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">agent-browser v0.41.2</p>
-              <span className="text-[10px] text-blue-600 font-mono">Isolated Subprocess</span>
+              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">
+                {execution?.summary?.engine === "playwright" ? "Playwright Native" : "agent-browser (Legacy)"}
+              </p>
+              <span className="text-[10px] text-blue-600 font-mono">
+                {execution?.summary?.engine === "playwright" ? "Ephemeral Isolated Context" : "Subprocess Adapter"}
+              </span>
             </div>
           </div>
+
+          {execution.liveViewport && (
+            <div className="p-4 rounded-xl bg-white dark:bg-[#161F30] border border-blue-500/30 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Worker Viewport Stream
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">Real-time WebSocket Frame</span>
+              </div>
+              <div className="aspect-video max-h-[420px] bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800">
+                <img
+                  src={execution.liveViewport}
+                  alt="Live Worker Viewport"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

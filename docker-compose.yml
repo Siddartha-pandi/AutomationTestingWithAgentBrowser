@@ -62,6 +62,9 @@ services:
       STORAGE_DIR: /app/reports
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
       ZERO_AI_POLICY_ENFORCED: "true"
+      AUTOMATION_ENGINE: ${AUTOMATION_ENGINE:-playwright}
+      AUTOMATION_SERVICE_URL: http://automation_api:3001
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-enterprise-internal-secret-service-key-32chars}
     ports:
       - "8000:8000"
     volumes:
@@ -98,6 +101,9 @@ services:
       STORAGE_DIR: /app/reports
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
       ZERO_AI_POLICY_ENFORCED: "true"
+      AUTOMATION_ENGINE: ${AUTOMATION_ENGINE:-playwright}
+      AUTOMATION_SERVICE_URL: http://automation_api:3001
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-enterprise-internal-secret-service-key-32chars}
     volumes:
       - reports_storage:/app/reports
     command: ["celery", "-A", "backend.app.worker.celery_app", "worker", "-l", "INFO", "-c", "4"]
@@ -121,11 +127,67 @@ services:
       STORAGE_DIR: /app/reports
       DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-Asia/Kolkata}
       ZERO_AI_POLICY_ENFORCED: "true"
+      AUTOMATION_ENGINE: ${AUTOMATION_ENGINE:-playwright}
+      AUTOMATION_SERVICE_URL: http://automation_api:3001
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-enterprise-internal-secret-service-key-32chars}
     volumes:
       - reports_storage:/app/reports
     command: ["celery", "-A", "backend.app.worker.celery_app", "beat", "-l", "INFO"]
 
-  # 6. Next.js Enterprise SaaS Frontend UI
+  # 6. NestJS Playwright Automation API Service
+  automation_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.automation
+    container_name: automation_testing_nestjs_api
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      AUTOMATION_SERVICE_PORT: 3001
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-enterprise-internal-secret-service-key-32chars}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STORAGE_DIR: /app/reports
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-automation_platform_db}
+    ports:
+      - "3001:3001"
+    volumes:
+      - reports_storage:/app/reports
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 7. NestJS Playwright Dedicated Browser Worker (BullMQ Consumer)
+  automation_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.automation
+    container_name: automation_testing_playwright_worker
+    restart: unless-stopped
+    shm_size: "2gb"
+    depends_on:
+      automation_api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:-enterprise-internal-secret-service-key-32chars}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      STORAGE_DIR: /app/reports
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-automation_platform_db}
+      WORKER_CONCURRENCY: 4
+    volumes:
+      - reports_storage:/app/reports
+
+  # 8. Next.js Enterprise SaaS Frontend UI
   frontend:
     build:
       context: .
