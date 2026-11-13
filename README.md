@@ -151,15 +151,61 @@ Policy Status: 100% VERIFIED COMPLIANT (Zero AI / Strict Data Protection)
 
 ## 🧪 Comprehensive Automated Test Suites
 
-Run the full end-to-end regression test suite:
+The project follows a clean architecture separating unit tests from integration suites:
 
 ```bash
-python -m pytest tests/test_phase1_stabilization.py \
-                 tests/test_phase2_engine.py \
-                 tests/test_phase4_monitoring_reporting.py \
-                 tests/test_phase5_multiuser_enterprise.py \
-                 tests/test_phase6_production_readiness.py \
-                 -v
+# Run all tests
+make test
+# Or with pytest directly:
+python -m pytest tests -v
+
+# Run fast, isolated unit tests only
+make test-unit
+# Or:
+python -m pytest tests/unit -v
+
+# Run live integration and regression test suites
+make test-integration
+# Or:
+python -m pytest tests/integration -v
+
+# Run Playwright automation service test suites
+make test-automation
+```
+
+### Clean Architecture Directory Layout
+
+```text
+.
+├── alembic/                 # PostgreSQL database migrations
+├── automation-service/      # NestJS Playwright browser automation engine
+├── backend/                 # FastAPI REST & WebSocket backend service
+│   ├── app/
+│   │   ├── api/v1/          # REST endpoints (auth, flows, tests, audit, etc.)
+│   │   ├── browser/         # Agent-browser adapter & session isolation
+│   │   ├── core/            # Core settings & configuration
+│   │   ├── db/              # SQLAlchemy sessions & models base
+│   │   ├── engine/          # Flow DAG executor & test runner engines
+│   │   ├── models/          # PostgreSQL SQLAlchemy ORM models
+│   │   ├── reports/         # Executive reporting & artifact manager
+│   │   ├── schemas/         # Pydantic schemas (auth, flows, testing, etc.)
+│   │   ├── security/        # JWT, Argon2/Scrypt, RBAC, AES-256 Vault
+│   │   └── worker/          # Celery background tasks & beat schedules
+│   ├── config.py            # Backward-compatible configuration re-export
+│   ├── main.py              # Application entrypoint & FastAPI startup
+│   └── requirements.txt     # Python dependencies
+├── docker/                  # Isolated container build configurations
+│   ├── Dockerfile.automation
+│   ├── Dockerfile.backend
+│   └── Dockerfile.frontend
+├── docs/                    # Technical architecture & handover documentation
+├── frontend/                # Next.js 16 SaaS frontend application
+├── reports/                 # Private storage (screenshots, snapshots, exports)
+├── scripts/                 # Compliance & production audit scripts
+└── tests/                   # Pytest test suites
+    ├── conftest.py          # Shared test fixtures & database configuration
+    ├── unit/                # Fast, isolated unit & security policy tests
+    └── integration/         # Database, worker, and phase regression suites
 ```
 
 ### Verified Test Modules (64 Passing Tests):

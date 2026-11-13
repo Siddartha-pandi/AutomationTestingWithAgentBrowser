@@ -33,6 +33,12 @@ export class ActionExecutorService {
       let extracted_data: Record<string, any> | undefined;
 
       switch (action) {
+        case 'start':
+        case 'end': {
+          output = { status: 'ok', node: action };
+          break;
+        }
+
         case 'navigate': {
           const url = cfg.url || cfg.target_url;
           if (!url) throw new Error("Action 'navigate' requires a 'url' config.");

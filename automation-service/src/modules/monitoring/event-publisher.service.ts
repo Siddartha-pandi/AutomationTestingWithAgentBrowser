@@ -31,19 +31,31 @@ export class EventPublisherService implements OnModuleInit, OnModuleDestroy {
     const currentSeq = (this.sequences.get(executionId) || 0) + 1;
     this.sequences.set(executionId, currentSeq);
 
-    const event: ExecutionEvent<T> = {
-      event_id: `evt-${Date.now()}-${currentSeq}`,
+    const eventId = `evt-${Date.now()}-${currentSeq}`;
+    const timestamp = new Date().toISOString();
+
+    // Standardized dual-compatible event envelope (supports both contract and legacy event_bus schema)
+    const event = {
+      event_id: eventId,
+      id: eventId,
       execution_id: executionId,
       seq: currentSeq,
-      timestamp: new Date().toISOString(),
+      timestamp,
       type,
       payload,
+      data: payload,
     };
 
-    const channel = `execution:events:${executionId}`;
+    const payloadJson = JSON.stringify(event);
+    const channel1 = `execution:events:${executionId}`;
+    const channel2 = `execution:channel:${executionId}`;
+
     try {
       if (this.redisClient && this.redisClient.status === 'ready') {
-        await this.redisClient.publish(channel, JSON.stringify(event));
+        await Promise.all([
+          this.redisClient.publish(channel1, payloadJson),
+          this.redisClient.publish(channel2, payloadJson),
+        ]);
       }
     } catch (err: any) {
       this.logger.debug(`Failed to publish event to Redis: ${err.message}`);

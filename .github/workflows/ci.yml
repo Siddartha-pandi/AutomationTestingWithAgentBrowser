@@ -134,7 +134,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.backend
+          file: ./docker/Dockerfile.backend
           push: false
           tags: automation-backend:test
 
@@ -142,7 +142,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.frontend
+          file: ./docker/Dockerfile.frontend
           push: false
           tags: automation-frontend:test
 
@@ -150,6 +150,6 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.automation
+          file: ./docker/Dockerfile.automation
           push: false
           tags: automation-service:test

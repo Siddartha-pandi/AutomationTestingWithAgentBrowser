@@ -42,7 +42,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: docker/Dockerfile.backend
     container_name: automation_testing_api
     restart: unless-stopped
     depends_on:
@@ -81,7 +81,7 @@ services:
   celery_worker:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: docker/Dockerfile.backend
     container_name: automation_testing_worker
     restart: unless-stopped
     depends_on:
@@ -112,7 +112,7 @@ services:
   celery_beat:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: docker/Dockerfile.backend
     container_name: automation_testing_beat
     restart: unless-stopped
     depends_on:
@@ -138,7 +138,7 @@ services:
   automation_api:
     build:
       context: .
-      dockerfile: Dockerfile.automation
+      dockerfile: docker/Dockerfile.automation
     container_name: automation_testing_nestjs_api
     restart: unless-stopped
     depends_on:
@@ -168,7 +168,7 @@ services:
   automation_worker:
     build:
       context: .
-      dockerfile: Dockerfile.automation
+      dockerfile: docker/Dockerfile.automation
     container_name: automation_testing_playwright_worker
     restart: unless-stopped
     shm_size: "2gb"
@@ -191,7 +191,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: docker/Dockerfile.frontend
     container_name: automation_testing_frontend
     restart: unless-stopped
     depends_on:

@@ -201,8 +201,8 @@ def main() -> int:
     # Check 9: Containerization & Turnkey Deployment
     # -------------------------------------------------------------------------
     has_compose = (root_dir / "docker-compose.yml").exists()
-    has_backend_docker = (root_dir / "Dockerfile.backend").exists()
-    has_frontend_docker = (root_dir / "Dockerfile.frontend").exists()
+    has_backend_docker = (root_dir / "docker" / "Dockerfile.backend").exists() or (root_dir / "Dockerfile.backend").exists()
+    has_frontend_docker = (root_dir / "docker" / "Dockerfile.frontend").exists() or (root_dir / "Dockerfile.frontend").exists()
     has_env_example = (root_dir / ".env.example").exists()
     check9_passed = has_compose and has_backend_docker and has_frontend_docker and has_env_example
     if not check9_passed:

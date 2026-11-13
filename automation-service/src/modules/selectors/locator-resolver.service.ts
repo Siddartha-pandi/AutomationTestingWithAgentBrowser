@@ -13,6 +13,7 @@ export interface SelectorConfig {
   xpath?: string;
   exact?: boolean;
   strict?: boolean;
+  timeout_ms?: number;
 }
 
 export interface ResolutionResult {
@@ -32,7 +33,13 @@ export class LocatorResolverService {
     // 1. Explicit Strategy Routing if configured
     if (config.strategy && config.strategy !== 'auto') {
       const loc = this.resolveExplicitStrategy(page, config);
-      const count = await loc.count();
+      let count = await loc.count();
+      if (count === 0 && config.timeout_ms && config.timeout_ms > 0) {
+        try {
+          await loc.first().waitFor({ state: 'attached', timeout: config.timeout_ms });
+          count = await loc.count();
+        } catch {}
+      }
       if (count === 0) {
         throw new Error(`Element not found using strategy '${config.strategy}' with target: ${JSON.stringify(config)}`);
       }
@@ -51,7 +58,13 @@ export class LocatorResolverService {
     // Priority 1: Explicit Test ID (data-testid, data-test, data-qa)
     if (config.test_id) {
       const loc = page.getByTestId(config.test_id);
-      const count = await loc.count();
+      let count = await loc.count();
+      if (count === 0 && config.timeout_ms && config.timeout_ms > 0) {
+        try {
+          await loc.first().waitFor({ state: 'attached', timeout: config.timeout_ms });
+          count = await loc.count();
+        } catch {}
+      }
       if (count === 1) {
         return { locator: loc, resolvedStrategy: 'test_id', resolvedPattern: config.test_id, matchCount: 1 };
       }

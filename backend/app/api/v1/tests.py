@@ -36,6 +36,43 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tests", tags=["Testing Automation"])
 
 
+def test_case_to_graph_definition(test_case: TestCaseDefinition) -> dict[str, Any]:
+    """Converts a deterministic TestCaseDefinition into an executable DAG graph definition."""
+    all_steps = list(test_case.setup_steps) + list(test_case.steps) + list(test_case.teardown_steps)
+    nodes: list[dict[str, Any]] = [{"id": "node-start", "type": "start", "config": {}}]
+    edges: list[dict[str, Any]] = []
+    prev_node_id = "node-start"
+
+    for i, step in enumerate(all_steps):
+        node_id = step.id or f"step-{i+1}"
+        node_type = (
+            step.action.value
+            if (step.step_type == "action" and step.action)
+            else (step.assertion or "element_visible")
+        )
+        node_config = dict(step.config or {})
+        if step.target:
+            node_config.update(step.target.model_dump(exclude_none=True))
+        if step.expected is not None:
+            node_config["expected"] = step.expected
+            node_config["expected_text"] = step.expected
+            node_config["value"] = step.expected
+        if step.attribute_name:
+            node_config["attribute_name"] = step.attribute_name
+        if step.retries:
+            node_config["max_retries"] = step.retries
+        if step.on_failure == "continue":
+            node_config["continue_on_failure"] = True
+
+        nodes.append({"id": node_id, "type": node_type, "config": node_config})
+        edges.append({"source": prev_node_id, "target": node_id})
+        prev_node_id = node_id
+
+    nodes.append({"id": "node-end", "type": "end", "config": {}})
+    edges.append({"source": prev_node_id, "target": "node-end"})
+    return {"nodes": nodes, "edges": edges}
+
+
 @router.post("", response_model=TestCaseResponse, status_code=status.HTTP_201_CREATED)
 def create_test_case(
     payload: TestCaseCreateRequest,
@@ -473,9 +510,40 @@ def execute_test_case_endpoint(
     )
 
     if payload.async_exec:
+        from backend.config import settings
+        if settings.automation_engine == "playwright":
+            try:
+                from backend.app.services.automation_client import automation_client
+                from backend.app.worker.tasks import resolve_approved_domains_for_execution
+
+                try:
+                    approved_domains = resolve_approved_domains_for_execution(db, execution)
+                except Exception:
+                    approved_domains = ["*"]
+
+                graph_def = test_case_to_graph_definition(test_case_def)
+                job_info = automation_client.submit_execution(
+                    execution_id=execution.id,
+                    project_id=test.project_id,
+                    user_id=current_user.id,
+                    graph_definition=graph_def,
+                    environment_id=payload.environment_id,
+                    test_case_id=test.id,
+                    allowed_domains=approved_domains,
+                    variables=payload.test_data_row or {},
+                )
+                execution.summary = {"engine": "playwright", "job_id": job_info.get("job_id")}
+                db.commit()
+                return ExecutionDetailResponse.model_validate(execution)
+            except Exception as play_err:
+                logger.warning(
+                    "Playwright automation service dispatch unavailable (%s), falling back to Celery worker.",
+                    play_err,
+                )
+
         from backend.app.worker.tasks import execute_test_case_task
         task = execute_test_case_task.delay(str(execution.id), payload.test_data_row)
-        execution.summary = {"celery_task_id": task.id}
+        execution.summary = {"engine": "agent_browser", "celery_task_id": task.id}
         db.commit()
         return ExecutionDetailResponse.model_validate(execution)
 

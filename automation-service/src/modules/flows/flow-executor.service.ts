@@ -247,9 +247,10 @@ export class FlowExecutorService {
         // Execute Action / Assertion with optional retry policy
         for (let attempt = 0; attempt <= maxRetries; attempt++) {
           try {
-            if (this.isAssertion(actionType)) {
+            const normalizedAction = this.normalizeAssertion(actionType);
+            if (this.isAssertion(normalizedAction)) {
               const res = await this.assertionExecutor.execute(page, {
-                assertion: actionType,
+                assertion: normalizedAction,
                 config,
                 variables: state.variables,
               });
@@ -358,7 +359,20 @@ export class FlowExecutorService {
     };
   }
 
+  normalizeAssertion(action: string): string {
+    const act = action.toLowerCase();
+    if (act === 'assert_visible') return 'element_visible';
+    if (act === 'assert_hidden') return 'element_hidden';
+    if (act === 'assert_enabled') return 'element_enabled';
+    if (act === 'assert_disabled') return 'element_disabled';
+    if (act === 'assert_text' || act === 'assert_text_contains') return 'text_contains';
+    if (act === 'assert_text_equals') return 'text_equals';
+    if (act === 'assert_url' || act === 'assert_url_equals') return 'url_equals';
+    return act;
+  }
+
   private isAssertion(action: string): boolean {
+    const act = this.normalizeAssertion(action);
     const assertions = [
       'element_visible',
       'element_hidden',
@@ -373,6 +387,6 @@ export class FlowExecutorService {
       'attribute_equals',
       'input_value_equals',
     ];
-    return assertions.includes(action.toLowerCase());
+    return assertions.includes(act);
   }
 }

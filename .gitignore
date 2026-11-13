@@ -59,6 +59,10 @@ next-env.d.ts
 *.stream
 *.port
 *.pid
+reports/agent_home/
+reports/agent_socket/
+temp_*/
+**/temp_*/
 
 # Ephemeral execution outputs & reports (preserve folder structure via .gitkeep)
 reports/screenshots/*
